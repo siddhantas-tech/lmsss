@@ -39,9 +39,8 @@ import { cn } from "@/lib/utils";
 import { getCategories } from "@/api/categories";
 import { getLabs } from "@/api/labs";
 import { getCourseById } from "@/api/courses";
-import { createLesson, getLessonsByCourse } from "@/api/lessons";
+import { createCourse } from "@/api/courses";
 import api from "@/api/axios";
-import { supabase } from "@/lib/supabaseClient";
 // import { updateCourse } from "@/api/courses.api"; // wire later
 
 interface Category {
@@ -80,11 +79,10 @@ export default function EditCoursePage() {
   }, []);
 
   const loadInitialData = async () => {
-    const [catRes, labRes, courseRes, lessonsRes] = await Promise.all([
+    const [catRes, labRes, courseRes] = await Promise.all([
       getCategories(),
       getLabs(),
       getCourseById(id!),
-      getLessonsByCourse(id!),
     ]);
 
     setCategories(Array.isArray(catRes.data) ? catRes.data : []);
@@ -96,24 +94,7 @@ export default function EditCoursePage() {
         description: courseRes.data.description || "",
         categoryId: courseRes.data.category_id || "",
       });
-    }
-
-    if (lessonsRes.data && Array.isArray(lessonsRes.data)) {
-      const mappedTopics = lessonsRes.data.map((l: any) => ({
-        id: l.id,
-        title: l.title,
-        description: l.description,
-        video: !!l.video_url, // Show video UI if URL exists
-        quiz: false, // Default closed
-        videoUrl: l.video_url || "",
-        duration: l.video_duration_seconds || 0, // Map backend column
-        quizDraftQuestion: "",
-        quizDraftOptions: ["", "", "", ""],
-        quizDraftCorrectIndex: 0,
-        quizQuestions: [], // TODO: Load quizzes if needed
-        uploading: false,
-      }));
-      setTopics(mappedTopics);
+      // TODO: load topics and labs for this course if needed
     }
   };
 
@@ -186,64 +167,31 @@ export default function EditCoursePage() {
   const handleTopicVideoUpload = async (topicId: number, file: File) => {
     updateTopic(topicId, { uploading: true, uploadProgress: 0, uploadError: "" });
     try {
-      // 1. Upload to Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `${id}/${fileName}`; // Organize by course ID
-
-      const { error: uploadError } = await supabase.storage
-        .from('videos') // Assumed bucket name
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) throw uploadError;
-
-      // 2. Get Public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('videos')
-        .getPublicUrl(filePath);
-
-      if (!publicUrl) throw new Error("Failed to get public URL");
-
-      // 3. Send Metadata to Backend (JSON)
-      // Using relative URL to leverage Vite proxy and Axios baseURL (/api)
-      const metadataUrl = "/video";
-      console.log("Sending metadata to:", metadataUrl);
-
-      // COMMENTED OUT: This creates a duplicate topic in the Express backend.
-      // We will let handleSave create the topic with full details in the Main Backend.
-      /*
-      await api.post(metadataUrl, {
+      // Backend only accepts URLs, so we need a backend upload endpoint.
+      // For now, we will simulate and ask for a URL.
+      const url = prompt("Paste the video URL (YouTube, CDN, or hosted file):");
+      if (!url) {
+        updateTopic(topicId, { uploading: false, uploadProgress: 0, uploadError: "Upload cancelled." });
+        return;
+      }
+      // Call backend to create video record
+      await api.post("/video", {
         title: file.name,
-        url: publicUrl,
+        url,
         courseId: id!,
       });
-      */
-
       updateTopic(topicId, {
         uploading: false,
         uploadProgress: 100,
-        videoUrl: publicUrl,
+        videoUrl: url,
         videoFileName: file.name,
         uploadError: "",
       });
     } catch (e: any) {
-      console.error("Upload Metadata Error:", e);
-      if (e.config) {
-        console.error("Failed URL:", e.config.url, "Base:", e.config.baseURL);
-      }
-      if (e.response) {
-        console.error("Response Status:", e.response.status);
-      }
-
-
-      const errorMsg = `Upload failed: ${e?.response?.status} - ${JSON.stringify(e?.response?.data) || e.message}`;
       updateTopic(topicId, {
         uploading: false,
         uploadProgress: 0,
-        uploadError: errorMsg,
+        uploadError: e?.response?.data?.message || e?.message || "Failed to save video URL.",
       });
     }
   };
@@ -262,47 +210,23 @@ export default function EditCoursePage() {
   };
 
   const handleSave = async () => {
-    // If we are editing, we usually want to update. 
-    // But since the backend apparently lacks a PUT endpoint for courses (per comments), 
-    // we should NOT create a new course as that duplicates data and disconnects the videos we just uploaded.
-
-    // For now, we'll assume the user is done linking videos/labs.
-    // We can't update title/description/category without a backend endpoint.
-
-    // We can't update course details (title/desc) due to backend limitation, 
-    // but we MUST save the lessons/topics we created.
-
+    if (!course.title.trim() || !course.description.trim() || !course.categoryId) {
+      alert('Please fill all course fields');
+      return;
+    }
     setSubmitting(true);
     try {
-      // 1. Save all topics as lessons
-      const lessonPromises = topics.map(topic => {
-        // Only save if it's a new topic (we assume it is if id is number/Date.now(), 
-        // though ideally we'd track 'isNew'). 
-        // For this fix, we'll try to save all that look like they have content.
-
-        // Prepare payload matches what backend likely expects for a lesson
-        const payload = {
-          course_id: id,
-          title: topic.title,
-          description: topic.description || "",
-          video_url: topic.videoUrl || "",
-          duration: topic.duration || 0,
-          id: typeof topic.id === 'string' ? topic.id : undefined, // Include ID for updates
-        };
-
-        return createLesson(payload);
+      // Since backend lacks PUT, create a new course as a workaround
+      await createCourse({
+        title: course.title,
+        description: course.description,
+        category_id: course.categoryId,
       });
-
-      await Promise.all(lessonPromises);
-
-      alert('Topics and videos saved successfully!');
+      alert('Course saved as a new course (edit not supported by backend).');
       navigate('/admin/courses');
     } catch (err: any) {
-      console.error('Failed to save topics:', err);
-      if (err.config) {
-        console.error("Failed URL:", err.config.url);
-      }
-      alert(`Save Failed: ${err?.response?.status} - ${JSON.stringify(err?.response?.data) || err?.message}`);
+      console.error('Failed to save course:', err);
+      alert(err?.response?.data?.message || err?.message || 'Failed to save course');
     } finally {
       setSubmitting(false);
     }
@@ -464,39 +388,39 @@ export default function EditCoursePage() {
                           {(Array.isArray(topic.quizDraftOptions)
                             ? topic.quizDraftOptions
                             : ["", "", "", ""]).map((opt: string, idx: number) => {
-                              const isCorrect = Number(topic.quizDraftCorrectIndex || 0) === idx;
+                            const isCorrect = Number(topic.quizDraftCorrectIndex || 0) === idx;
 
-                              return (
-                                <div
-                                  key={idx}
-                                  className={cn(
-                                    "flex items-center gap-2 rounded-md border p-2",
-                                    isCorrect ? "border-green-600 bg-green-50" : ""
-                                  )}
-                                >
-                                  <input
-                                    type="radio"
-                                    name={`correct-${topic.id}`}
-                                    checked={isCorrect}
-                                    onChange={() =>
-                                      updateTopic(topic.id, { quizDraftCorrectIndex: idx })
-                                    }
-                                  />
-                                  <Input
-                                    value={opt}
-                                    onChange={(e) => {
-                                      const next = Array.isArray(topic.quizDraftOptions)
-                                        ? [...topic.quizDraftOptions]
-                                        : ["", "", "", ""];
-                                      next[idx] = e.target.value;
-                                      updateTopic(topic.id, { quizDraftOptions: next });
-                                    }}
-                                    placeholder={`Option ${idx + 1}`}
-                                    className={cn(isCorrect ? "border-green-600" : "")}
-                                  />
-                                </div>
-                              );
-                            })}
+                            return (
+                              <div
+                                key={idx}
+                                className={cn(
+                                  "flex items-center gap-2 rounded-md border p-2",
+                                  isCorrect ? "border-green-600 bg-green-50" : ""
+                                )}
+                              >
+                                <input
+                                  type="radio"
+                                  name={`correct-${topic.id}`}
+                                  checked={isCorrect}
+                                  onChange={() =>
+                                    updateTopic(topic.id, { quizDraftCorrectIndex: idx })
+                                  }
+                                />
+                                <Input
+                                  value={opt}
+                                  onChange={(e) => {
+                                    const next = Array.isArray(topic.quizDraftOptions)
+                                      ? [...topic.quizDraftOptions]
+                                      : ["", "", "", ""];
+                                    next[idx] = e.target.value;
+                                    updateTopic(topic.id, { quizDraftOptions: next });
+                                  }}
+                                  placeholder={`Option ${idx + 1}`}
+                                  className={cn(isCorrect ? "border-green-600" : "")}
+                                />
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                       <div>
