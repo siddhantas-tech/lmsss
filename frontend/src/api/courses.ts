@@ -11,6 +11,9 @@ export const getCourseDetails = (id: string) =>
 export const createCourse = (data: any) =>
   api.post("/courses", data);
 
+export const updateCourse = (id: string, data: any) =>
+  api.put(`/courses/${id}`, data);
+
 export const deleteCourse = (id: string) =>
   api.delete(`/courses/${id}`);
 

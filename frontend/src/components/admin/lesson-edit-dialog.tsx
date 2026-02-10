@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Loader2, Upload, Video as VideoIcon } from 'lucide-react'
+import { updateVideo } from '@/api/videos'
 
 interface LessonEditDialogProps {
     lesson: {
@@ -21,8 +22,6 @@ interface LessonEditDialogProps {
 
 export function LessonEditDialog({ lesson, open, onOpenChange, onSuccess }: LessonEditDialogProps) {
     const [loading, setLoading] = useState(false)
-    const [uploading, setUploading] = useState(false)
-    const [uploadProgress, setUploadProgress] = useState(0)
     const [videoUrl, setVideoUrl] = useState('')
     const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -47,8 +46,26 @@ export function LessonEditDialog({ lesson, open, onOpenChange, onSuccess }: Less
         if (!lesson) return
 
         setLoading(true)
-        setLoading(false)
-        alert('Saving lesson must be handled by the backend (Supabase removed from frontend).')
+        try {
+            const formData = new FormData(e.currentTarget)
+            const title = formData.get('title') as string
+            const videoUrl = formData.get('video_url') as string
+
+            // If video URL changed, update video record via PUT /api/video/:id
+            if (videoUrl && videoUrl !== lesson.video_url) {
+                await updateVideo(lesson.id, { title, url: videoUrl })
+            }
+
+            // TODO: update lesson title/description/duration if backend supports it
+
+            onSuccess()
+            onOpenChange(false)
+        } catch (err: any) {
+            console.error('Failed to save lesson:', err)
+            alert(err?.response?.data?.message || err?.message || 'Failed to save lesson')
+        } finally {
+            setLoading(false)
+        }
     }
 
     if (!lesson) return null
@@ -107,23 +124,10 @@ export function LessonEditDialog({ lesson, open, onOpenChange, onSuccess }: Less
                                 <Button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
-                                    disabled={uploading}
                                     className="w-full border-2 border-foreground bg-yellow-400 text-foreground font-black hover:bg-yellow-500 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all"
                                 >
-                                    {uploading ? (
-                                        <><Loader2 className="animate-spin mr-2 h-4 w-4" /> UPLOADING {uploadProgress}%</>
-                                    ) : (
-                                        <><Upload className="mr-2 h-4 w-4 stroke-[3px]" /> UPLOAD FROM COMPUTER</>
-                                    )}
+                                    <><Upload className="mr-2 h-4 w-4 stroke-[3px]" /> UPLOAD FROM COMPUTER</>
                                 </Button>
-                                {uploading && (
-                                    <div className="mt-2 h-2 w-full bg-foreground/10 border border-foreground overflow-hidden">
-                                        <div
-                                            className="h-full bg-primary transition-all duration-300"
-                                            style={{ width: `${uploadProgress}%` }}
-                                        />
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -151,7 +155,7 @@ export function LessonEditDialog({ lesson, open, onOpenChange, onSuccess }: Less
                         </Button>
                         <Button
                             type="submit"
-                            disabled={loading || uploading}
+                            disabled={loading}
                             className="border-4 border-foreground bg-primary text-primary-foreground font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all"
                         >
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin text-background" />}

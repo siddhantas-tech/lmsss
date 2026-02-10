@@ -4,7 +4,6 @@ import { Link, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LessonQuizModal } from '@/components/course/lesson-quiz-modal'
-import { getLessonsByCourse } from '@/api/lessons'
 import { getQuizByTopic } from '@/api/quiz'
 
 interface Lesson {

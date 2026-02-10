@@ -39,7 +39,8 @@ import { cn } from "@/lib/utils";
 import { getCategories } from "@/api/categories";
 import { getLabs } from "@/api/labs";
 import { getCourseById } from "@/api/courses";
-import { createCourse } from "@/api/courses";
+import { createCourse, updateCourse } from "@/api/courses";
+import { updateVideo } from "@/api/videos";
 import api from "@/api/axios";
 // import { updateCourse } from "@/api/courses.api"; // wire later
 
@@ -108,6 +109,7 @@ export default function EditCoursePage() {
         video: false,
         quiz: false,
         videoUrl: "",
+        videoId: undefined,
         quizDraftQuestion: "",
         quizDraftOptions: ["", "", "", ""],
         quizDraftCorrectIndex: 0,
@@ -167,19 +169,27 @@ export default function EditCoursePage() {
   const handleTopicVideoUpload = async (topicId: number, file: File) => {
     updateTopic(topicId, { uploading: true, uploadProgress: 0, uploadError: "" });
     try {
-      // Backend only accepts URLs, so we need a backend upload endpoint.
-      // For now, we will simulate and ask for a URL.
       const url = prompt("Paste the video URL (YouTube, CDN, or hosted file):");
       if (!url) {
         updateTopic(topicId, { uploading: false, uploadProgress: 0, uploadError: "Upload cancelled." });
         return;
       }
-      // Call backend to create video record
-      await api.post("/video", {
-        title: file.name,
-        url,
-        courseId: id!,
-      });
+
+      const topic = topics.find(t => t.id === topicId);
+
+      if (topic?.videoId) {
+        // Update existing video via PUT /api/video/:id
+        await updateVideo(topic.videoId, { title: file.name, url });
+      } else {
+        // Create new video record (assuming POST /video returns the new record)
+        const { data: newVideo } = await api.post("/video", {
+          title: file.name,
+          url,
+          courseId: id!,
+        });
+        updateTopic(topicId, { videoId: newVideo.id });
+      }
+
       updateTopic(topicId, {
         uploading: false,
         uploadProgress: 100,
@@ -216,13 +226,19 @@ export default function EditCoursePage() {
     }
     setSubmitting(true);
     try {
-      // Since backend lacks PUT, create a new course as a workaround
-      await createCourse({
+      const payload = {
         title: course.title,
         description: course.description,
         category_id: course.categoryId,
-      });
-      alert('Course saved as a new course (edit not supported by backend).');
+      };
+
+      if (id) {
+        await updateCourse(id, payload);
+        alert('Course updated successfully.');
+      } else {
+        await createCourse(payload);
+        alert('Course created successfully.');
+      }
       navigate('/admin/courses');
     } catch (err: any) {
       console.error('Failed to save course:', err);
