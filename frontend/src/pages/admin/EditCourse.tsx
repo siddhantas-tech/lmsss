@@ -95,7 +95,10 @@ export default function EditCoursePage() {
         description: courseRes.data.description || "",
         categoryId: courseRes.data.category_id || "",
       });
-      // TODO: load topics and labs for this course if needed
+      // Load topics for this course if available
+      if (courseRes.data.topics) {
+        setTopics(courseRes.data.topics);
+      }
     }
   };
 
