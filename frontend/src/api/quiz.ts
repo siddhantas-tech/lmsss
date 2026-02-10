@@ -12,13 +12,13 @@ export const getMyAttempts = () =>
 
 // Admin
 export const getQuizQuestions = (params: any) =>
-  api.get("/admin/quiz", { params });
+  api.get("/quiz/admin", { params });
 
 export const createQuizQuestion = (data: any) =>
-  api.post("/admin/quiz", data);
+  api.post("/quiz/admin", data);
 
 export const updateQuizQuestion = (id: string, data: any) =>
-  api.put(`/admin/quiz/${id}`, data);
+  api.put(`/quiz/admin/${id}`, data);
 
 export const deleteQuizQuestion = (id: string) =>
-  api.delete(`/admin/quiz/${id}`);
+  api.delete(`/quiz/admin/${id}`);
