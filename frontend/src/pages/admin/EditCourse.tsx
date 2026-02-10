@@ -222,11 +222,13 @@ export default function EditCoursePage() {
     );
   };
 
-  const saveTopicsToBackend = async (courseId: string) => {
-    // TODO: Implement bulk topics save endpoint
-    // Example payload:
-    // await api.put(`/courses/${courseId}/topics`, { topics });
-    console.log('Saving topics to backend not yet implemented');
+  const saveTopicsToBackend = async (topics: any[]) => {
+    try {
+      await api.put(`/courses/${id}/topics`, { topics });
+      console.log('Topics saved to backend');
+    } catch (e: any) {
+      console.error('Failed to save topics:', e);
+    }
   };
 
   const handleSave = async () => {
@@ -244,7 +246,7 @@ export default function EditCoursePage() {
 
       if (id) {
         await updateCourse(id, payload);
-        await saveTopicsToBackend(id);
+        await saveTopicsToBackend(topics);
         alert('Course updated successfully.');
       } else {
         await createCourse(payload);
