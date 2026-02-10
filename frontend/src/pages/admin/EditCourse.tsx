@@ -38,7 +38,7 @@ import { cn } from "@/lib/utils";
 
 import { getCategories } from "@/api/categories";
 import { getLabs } from "@/api/labs";
-import { getCourseById } from "@/api/courses";
+import { getCourseDetails } from "@/api/courses";
 import { createCourse, updateCourse } from "@/api/courses";
 import { updateVideo } from "@/api/videos";
 import api from "@/api/axios";
@@ -83,7 +83,7 @@ export default function EditCoursePage() {
     const [catRes, labRes, courseRes] = await Promise.all([
       getCategories(),
       getLabs(),
-      getCourseById(id!),
+      getCourseDetails(id!),
     ]);
 
     setCategories(Array.isArray(catRes.data) ? catRes.data : []);
