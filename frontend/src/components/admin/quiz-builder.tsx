@@ -9,7 +9,7 @@ import { getQuizQuestions, createQuizQuestion, updateQuizQuestion, deleteQuizQue
 import { cn } from '@/lib/utils'
 
 interface QuizBuilderProps {
-    lesson: {
+    topic: {
         id: string
         title: string
         course_id: string
@@ -35,17 +35,17 @@ export function QuizBuilder({ lesson, open, onOpenChange, onSuccess }: QuizBuild
     const [editingId, setEditingId] = useState<string | null>(null)
 
     useEffect(() => {
-        if (open && lesson?.id) {
+        if (open && topic?.id) {
             loadQuestions()
         }
-    }, [open, lesson?.id])
+    }, [open, topic?.id])
 
     const loadQuestions = async () => {
         setLoading(true)
         try {
             // Backend expects topicId query param, but we were sending lessonId.
             // Also need to map response back to component state.
-            const res = await getQuizQuestions({ topicId: lesson?.id })
+            const res = await getQuizQuestions({ topicId: topic?.id })
 
             if (Array.isArray(res.data)) {
                 const mappedQuestions: Question[] = res.data.map((q: any) => ({
