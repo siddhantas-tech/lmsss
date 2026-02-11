@@ -43,8 +43,23 @@ export function QuizBuilder({ lesson, open, onOpenChange, onSuccess }: QuizBuild
     const loadQuestions = async () => {
         setLoading(true)
         try {
-            const res = await getQuizQuestions({ lessonId: lesson?.id })
-            setQuestions(Array.isArray(res.data) ? res.data : [])
+            // Backend expects topicId query param, but we were sending lessonId.
+            // Also need to map response back to component state.
+            const res = await getQuizQuestions({ topicId: lesson?.id })
+
+            if (Array.isArray(res.data)) {
+                const mappedQuestions: Question[] = res.data.map((q: any) => ({
+                    id: q.id,
+                    text: q.question_text,
+                    // Map options array of objects to array of strings
+                    options: q.quiz_options?.map((o: any) => o.option_text) || [],
+                    // Find index of option where is_correct is true
+                    correctIndex: q.quiz_options?.findIndex((o: any) => o.is_correct) ?? 0
+                }))
+                setQuestions(mappedQuestions)
+            } else {
+                setQuestions([])
+            }
         } catch (e: any) {
             console.error('Failed to load quiz questions:', e)
         } finally {
@@ -57,26 +72,48 @@ export function QuizBuilder({ lesson, open, onOpenChange, onSuccess }: QuizBuild
         const options = draftOptions.map(o => o.trim()).filter(Boolean)
         if (!text || options.length < 2) return
 
+        // Construct payload to match backend schema
         const payload = {
-            text,
-            options,
-            correctIndex: Number(draftCorrectIndex),
-            lessonId: lesson?.id,
+            topic_id: lesson?.id,
+            course_id: lesson?.course_id,
+            question_text: text,
+            question_type: 'multiple_choice', // Default type
+            question_order: questions.length + 1, // Simple ordering
+            options: draftOptions
+                .filter(o => o.trim()) // Ensure we strictly only send non-empty options
+                .map((optToken, idx) => ({
+                    option_text: optToken,
+                    is_correct: idx === Number(draftCorrectIndex)
+                }))
         }
 
         try {
             if (editingId) {
+                // For update, we only need the fields being updated
                 await updateQuizQuestion(editingId, payload)
-                console.log(payload)
-                setQuestions(qs => qs.map(q => q.id === editingId ? { ...q, ...payload } : q))
-                console.log(questions)
+
+                // Update local state to reflect changes immediately
+                setQuestions(qs => qs.map(q => q.id === editingId ? {
+                    id: editingId,
+                    text: text,
+                    options: draftOptions.filter(o => o.trim()),
+                    correctIndex: Number(draftCorrectIndex)
+                } : q))
             } else {
                 const res = await createQuizQuestion(payload)
-                setQuestions(qs => [...qs, { ...payload, id: res.data.id || Date.now().toString() }])
+                // Append new question to local state
+                const newQuestion: Question = {
+                    id: res.data.id,
+                    text: text,
+                    options: draftOptions.filter(o => o.trim()),
+                    correctIndex: Number(draftCorrectIndex)
+                }
+                setQuestions(qs => [...qs, newQuestion])
             }
             resetDraft()
         } catch (e: any) {
             console.error('Failed to save question:', e)
+            alert('Failed to save/update question. Check console for details.')
         }
     }
 

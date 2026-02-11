@@ -15,10 +15,10 @@ export const getQuizQuestions = (params: any) =>
   api.get("/quiz", { params });
 
 export const createQuizQuestion = (data: any) =>
-  api.post("/quiz", data);
+  api.post("/admin/quiz", data);
 
 export const updateQuizQuestion = (id: string, data: any) =>
-  api.put(`/quiz/${id}`, data);
+  api.put(`/admin/quiz/${id}`, data);
 
 export const deleteQuizQuestion = (id: string) =>
-  api.delete(`/quiz/${id}`);
+  api.delete(`/admin/quiz/${id}`);
