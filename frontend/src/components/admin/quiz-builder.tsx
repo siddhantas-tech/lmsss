@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/Label'
+import { Label } from '@/components/ui/label'
 import { FileQuestion, Plus, Trash2, Loader2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { getQuizQuestions, createQuizQuestion, updateQuizQuestion, deleteQuizQuestion } from '@/api/quiz'
@@ -26,7 +26,7 @@ interface Question {
     correctIndex: number
 }
 
-export function QuizBuilder({ lesson, open, onOpenChange, onSuccess }: QuizBuilderProps) {
+export function QuizBuilder({ topic, open, onOpenChange, onSuccess }: QuizBuilderProps) {
     const [questions, setQuestions] = useState<Question[]>([])
     const [loading, setLoading] = useState(false)
     const [draftQuestion, setDraftQuestion] = useState('')
@@ -72,25 +72,22 @@ export function QuizBuilder({ lesson, open, onOpenChange, onSuccess }: QuizBuild
         const options = draftOptions.map(o => o.trim()).filter(Boolean)
         if (!text || options.length < 2) return
 
-        // Construct payload to match backend schema
-        const payload = {
-            topic_id: lesson?.id,
-            course_id: lesson?.course_id,
-            question_text: text,
-            question_type: 'multiple_choice', // Default type
-            question_order: questions.length + 1, // Simple ordering
-            options: draftOptions
-                .filter(o => o.trim()) // Ensure we strictly only send non-empty options
-                .map((optToken, idx) => ({
-                    option_text: optToken,
-                    is_correct: idx === Number(draftCorrectIndex)
-                }))
-        }
-
         try {
             if (editingId) {
                 // For update, we only need the fields being updated
-                await updateQuizQuestion(editingId, payload)
+                await updateQuizQuestion(editingId, {
+                    topic_id: topic?.id,
+                    course_id: topic?.course_id,
+                    question_text: text,
+                    question_type: 'multiple_choice', // Default type
+                    question_order: questions.length + 1, // Simple ordering
+                    options: draftOptions
+                        .filter(o => o.trim()) // Ensure we strictly only send non-empty options
+                        .map((optToken, idx) => ({
+                            option_text: optToken,
+                            is_correct: idx === Number(draftCorrectIndex)
+                        }))
+                })
 
                 // Update local state to reflect changes immediately
                 setQuestions(qs => qs.map(q => q.id === editingId ? {
@@ -100,7 +97,19 @@ export function QuizBuilder({ lesson, open, onOpenChange, onSuccess }: QuizBuild
                     correctIndex: Number(draftCorrectIndex)
                 } : q))
             } else {
-                const res = await createQuizQuestion(payload)
+                const res = await createQuizQuestion({
+                    topic_id: topic?.id,
+                    course_id: topic?.course_id,
+                    question_text: text,
+                    question_type: 'multiple_choice',
+                    question_order: questions.length + 1,
+                    options: draftOptions
+                        .filter(o => o.trim())
+                        .map((optToken, idx) => ({
+                            option_text: optToken,
+                            is_correct: idx === Number(draftCorrectIndex)
+                        }))
+                })
                 // Append new question to local state
                 const newQuestion: Question = {
                     id: res.data.id,
