@@ -67,7 +67,9 @@ export function QuizBuilder({ lesson, open, onOpenChange, onSuccess }: QuizBuild
         try {
             if (editingId) {
                 await updateQuizQuestion(editingId, payload)
+                console.log(payload)
                 setQuestions(qs => qs.map(q => q.id === editingId ? { ...q, ...payload } : q))
+                console.log(questions)
             } else {
                 const res = await createQuizQuestion(payload)
                 setQuestions(qs => [...qs, { ...payload, id: res.data.id || Date.now().toString() }])
