@@ -43,6 +43,12 @@ export default function CoursePlayerPage() {
     const [error, setError] = useState<string | null>(null);
     const [isQuizOpen, setIsQuizOpen] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
+    const maxTimeWatched = useRef(0);
+
+    // Reset maxTimeWatched when topic changes
+    useEffect(() => {
+        maxTimeWatched.current = 0;
+    }, [currentTopicId]);
 
     useEffect(() => {
         const fetchTopicAndQuizzes = async () => {
@@ -75,12 +81,11 @@ export default function CoursePlayerPage() {
                 console.log("Fetched course topics:", topicsRes.data); // DEBUG
                 const topicsRaw = Array.isArray(topicsRes.data) ? topicsRes.data : [];
                 // topicsRaw should be an array of topics
-                const Topic: Topic[] = await Promise.all(
+                const mappedTopics: Topic[] = await Promise.all(
                     topicsRaw.map(async (topic: any, idx: number) => {
                         let questions: QuizQuestion[] = [];
                         try {
                             const quizRes = await getQuizByTopic(topic.id);
-                            // Map backend quiz format to QuizQuestion[]
                             const quizData = Array.isArray(quizRes.data?.questions) ? quizRes.data.questions : [];
                             questions = quizData.map((q: any) => ({
                                 id: q.id,
@@ -107,8 +112,8 @@ export default function CoursePlayerPage() {
                         };
                     })
                 );
-                setTopics(Topic);
-                setCurrentTopicId(Topic.length > 0 ? Topic[0].id : null);
+                setTopics(mappedTopics);
+                setCurrentTopicId(mappedTopics.length > 0 ? mappedTopics[0].id : null);
             } catch (error: any) {
                 console.error("Error fetching topics:", error);
                 setError(error.message || "Failed to load topics");
@@ -132,22 +137,28 @@ export default function CoursePlayerPage() {
             }
         }
 
-        video.addEventListener('ratechange', enforcePlaybackRate)
-        video.playbackRate = 1.0
-
         const preventSeek = () => {
-            // In a real app, you'd track the max time watched and prevent seeking beyond that
-            // For this demo, we let users browse but the code provided wanted to enforce strictness
-            // console.log("Seeking event triggered", e);
+            if (video.currentTime > maxTimeWatched.current) {
+                video.currentTime = maxTimeWatched.current;
+            }
         }
 
+        video.addEventListener('ratechange', enforcePlaybackRate)
         video.addEventListener('seeking', preventSeek)
+        video.playbackRate = 1.0
 
         return () => {
             video.removeEventListener('ratechange', enforcePlaybackRate)
             video.removeEventListener('seeking', preventSeek)
         }
-    }, [currentTopic])
+    }, [currentTopicId])
+
+    const handleTimeUpdate = () => {
+        const video = videoRef.current;
+        if (video && video.currentTime > maxTimeWatched.current) {
+            maxTimeWatched.current = video.currentTime;
+        }
+    };
 
     const handleVideoEnd = () => {
         if (currentTopic?.questions && currentTopic.questions.length > 0) {
@@ -184,7 +195,7 @@ export default function CoursePlayerPage() {
             const res = await submitQuiz(payload);
             const finalScore = res.data.score || score;
 
-            if (finalScore >= 70) {
+            if (finalScore >= 85) {
                 const currentIndex = topics.findIndex(t => t.id === currentTopicId)
                 const newTopics = [...topics]
 
@@ -224,8 +235,9 @@ export default function CoursePlayerPage() {
         <div className="bg-background min-h-screen">
             <div className="bg-card shadow-sm border-b border-border/5">
                 <div className="max-w-7xl mx-auto px-6 py-10">
-                    <div className="bg-red-100 p-4 mb-4 rounded text-xs font-mono">
-                        DEBUG INFO: CourseID: {courseId} | Topics Found: {topics.length} | Loading: {String(loading)}
+                    <div className="bg-primary/5 p-4 mb-6 rounded-2xl border border-primary/10 text-[10px] font-black uppercase tracking-widest text-primary/50 flex items-center gap-3">
+                        <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                        Session Active • {topics.length} Modules Loaded
                     </div>
                     <div className="flex items-center gap-4 mb-4">
                         <Link to="/courses" className="text-muted-foreground hover:text-foreground flex items-center gap-2 font-bold transition-colors">
@@ -250,12 +262,13 @@ export default function CoursePlayerPage() {
                                 <video
                                     key={currentTopic.id}
                                     ref={videoRef}
-                                    // Method A: Direct Stream from Express Backend
                                     src={`/api/video?topicId=${currentTopic.id}`}
                                     controls
                                     className="w-full h-full object-cover"
                                     onEnded={handleVideoEnd}
-                                    controlsList="nodownload"
+                                    onTimeUpdate={handleTimeUpdate}
+                                    controlsList="nodownload noplaybackrate"
+                                    disablePictureInPicture
                                     playsInline
                                     preload="metadata"
                                 >
