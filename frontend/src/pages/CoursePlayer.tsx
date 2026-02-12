@@ -35,6 +35,7 @@ interface QuizQuestion {
 
 export default function CoursePlayerPage() {
     const { id: courseId } = useParams<{ id: string }>(); // Map 'id' from route to 'courseId' variable
+    const [course, setCourse] = useState<{ title: string; description: string } | null>(null);
     const [topics, setTopics] = useState<Topic[]>([]);
     const [currentTopicId, setCurrentTopicId] = useState<string | null>(null);
     const [showQuizPrompt, setShowQuizPrompt] = useState(false);
@@ -61,7 +62,15 @@ export default function CoursePlayerPage() {
                     console.error("Enrollment check failed:", e);
                 }
 
+                const courseRes = await fetchCourseDetails(courseId);
                 const topicsRes = await getTopicsByCourse(courseId);
+
+                if (courseRes.data) {
+                    setCourse({
+                        title: courseRes.data.title || "Untitled Course",
+                        description: courseRes.data.description || ""
+                    });
+                }
 
                 console.log("Fetched course topics:", topicsRes.data); // DEBUG
                 const topicsRaw = Array.isArray(topicsRes.data) ? topicsRes.data : [];
@@ -223,7 +232,9 @@ export default function CoursePlayerPage() {
                             <ArrowLeft className="h-4 w-4" /> Back to Courses
                         </Link>
                     </div>
-                    <h1 className="text-4xl sm:text-5xl font-black text-foreground tracking-tight">Course Player</h1>
+                    <h1 className="text-4xl sm:text-5xl font-black text-foreground tracking-tight uppercase">
+                        {course?.title || "Course Player"}
+                    </h1>
                     <p className="text-muted-foreground font-bold mt-4 flex items-center gap-2">
                         <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
                         Progress: {topics.filter(t => t.completed).length} of {topics.length} topics completed
