@@ -39,7 +39,7 @@ import { cn } from "@/lib/utils";
 import { getCategories } from "@/api/categories";
 import { getLabs, getLabsForCourse, assignLabToCourse } from "@/api/labs";
 import { getCourseDetails, updateCourse, createCourse } from "@/api/courses";
-import { createTopic } from "@/api/topics";
+import { createTopic, updateTopic, deleteTopic, getTopicsByCourse } from "@/api/topics";
 import { createVideo, updateVideo } from "@/api/videos";
 import { QuizBuilder } from "@/components/admin/quiz-builder";
 import api from "@/api/axios";
@@ -83,46 +83,48 @@ export default function EditCoursePage() {
   }, []);
 
   const loadInitialData = async () => {
-    const [catRes, labRes, courseRes, assignedLabsRes] = await Promise.all([
-      getCategories(),
-      getLabs(),
-      getCourseDetails(id!),
-      getLabsForCourse(id!),
-    ]);
+    try {
+      const [catRes, labRes, courseRes, assignedLabsRes, topicsRes] = await Promise.all([
+        getCategories(),
+        getLabs(),
+        getCourseDetails(id!),
+        getLabsForCourse(id!),
+        getTopicsByCourse(id!),
+      ]);
 
-    setCategories(Array.isArray(catRes.data) ? catRes.data : []);
-    setLabs(Array.isArray(labRes.data) ? labRes.data : []);
+      setCategories(Array.isArray(catRes.data) ? catRes.data : []);
+      setLabs(Array.isArray(labRes.data) ? labRes.data : []);
 
-    if (Array.isArray(assignedLabsRes.data)) {
-      setSelectedLabs(assignedLabsRes.data.map((l: any) => l.id));
-    }
+      if (Array.isArray(assignedLabsRes.data)) {
+        setSelectedLabs(assignedLabsRes.data.map((l: any) => l.id));
+      }
 
-    if (courseRes.data) {
-      setCourse({
-        title: courseRes.data.title || "",
-        description: courseRes.data.description || "",
-        categoryId: courseRes.data.category_id || "",
-      });
-      // Load topics for this course if available
-      if (courseRes.data.topics) {
-        setTopics(courseRes.data.topics.map((t: any) => ({
+      if (courseRes.data) {
+        setCourse({
+          title: courseRes.data.title || "",
+          description: courseRes.data.description || "",
+          categoryId: courseRes.data.category_id || "",
+        });
+      }
+
+      if (Array.isArray(topicsRes.data)) {
+        setTopics(topicsRes.data.map((t: any) => ({
           ...t,
-          videoUrl: t.video_url, // Alias for UI consistency
+          videoUrl: t.video_url || "",
           videoId: t.video_id,
           showVideoSection: false
         })));
       }
+    } catch (error) {
+      console.error("Failed to load course data:", error);
     }
   };
 
   /* ------------------ topic handlers ------------------ */
   const handleAddTopic = async () => {
-    const title = window.prompt("Enter topic title:", "New Topic");
-    if (!title || !title.trim()) return;
-
     try {
       const res = await createTopic({
-        title: title.trim(),
+        title: "New Topic",
         courseId: id!,
         orderIndex: topics.length,
       });
@@ -141,11 +143,15 @@ export default function EditCoursePage() {
     }
   };
 
-  const removeTopic = (topicId: string) => {
-    // Since there's no delete API yet, we just remove it from the local list
-    // In a real app, we'd need a delete endpoint.
-    if (confirm("Remove topic from this session? (Note: No delete API detected)")) {
-      setTopics(topics.filter((t) => t.id !== topicId));
+  const removeTopic = async (topicId: string) => {
+    if (confirm("Are you sure you want to permanently delete this topic from the server?")) {
+      try {
+        await deleteTopic(topicId);
+        setTopics(topics.filter((t) => t.id !== topicId));
+      } catch (e: any) {
+        console.error("Failed to delete topic:", e);
+        alert(e?.response?.data?.message || "Failed to delete topic from server.");
+      }
     }
   };
 
@@ -154,8 +160,12 @@ export default function EditCoursePage() {
   };
 
   const saveTopicTitle = async (topicId: string, title: string) => {
-    // User mentioned there's no topic update API, so we skip this for now
-    console.log("Topic title updated locally:", title);
+    if (!title.trim()) return;
+    try {
+      await updateTopic(topicId, { title });
+    } catch (e: any) {
+      console.error("Failed to update topic title on server:", e);
+    }
   };
 
   const saveTopicVideoUrl = async (topicId: string, url: string) => {

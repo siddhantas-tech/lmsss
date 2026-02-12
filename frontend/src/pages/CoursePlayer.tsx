@@ -7,6 +7,7 @@ import { getQuizByTopic, submitQuiz } from '@/api/quiz'
 import { getCourseDetails as fetchCourseDetails } from '@/api/courses'
 import { TopicQuizModal } from '@/components/course/topic-quiz-modal'
 import { enrollCourse, getMyEnrollments } from '@/api/enrollments'
+import { getTopicsByCourse } from '@/api/topics'
 
 interface Topic {
     id: string;
@@ -60,9 +61,10 @@ export default function CoursePlayerPage() {
                     console.error("Enrollment check failed:", e);
                 }
 
-                const res = await fetchCourseDetails(courseId);
-                console.log("Fetched course topics:", res.data); // DEBUG
-                const topicsRaw = Array.isArray(res.data.topics) ? res.data.topics : [];
+                const topicsRes = await getTopicsByCourse(courseId);
+
+                console.log("Fetched course topics:", topicsRes.data); // DEBUG
+                const topicsRaw = Array.isArray(topicsRes.data) ? topicsRes.data : [];
                 // topicsRaw should be an array of topics
                 const Topic: Topic[] = await Promise.all(
                     topicsRaw.map(async (topic: any, idx: number) => {
@@ -88,10 +90,10 @@ export default function CoursePlayerPage() {
                             title: topic.title,
                             duration: topic.video_duration_seconds || topic.duration || 0,
                             completed: false,
-                            isLocked: idx !== 0, // Only first topic unlocked
+                            isLocked: idx !== 0,
                             videoUrl: topic.video_url || '',
                             description: topic.description || '',
-                            topicId: topic.id,
+                            course_id: topic.course_id || courseId,
                             questions,
                         };
                     })
