@@ -12,7 +12,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/Card";
-import { getLabs, createLab } from "@/api/labs";
+import { getLabs, createLab, updateLab, deleteLab } from "@/api/labs";
 import { useToast } from "@/hooks/use-toast";
 
 interface Lab {
@@ -66,7 +66,7 @@ export default function LabsPage() {
     const handleDelete = async (id: string) => {
         if (window.confirm("Are you sure you want to delete this lab?")) {
             try {
-                // Implement delete when API is available
+                await deleteLab(id);
                 setLabs(labs.filter(lab => lab.id !== id));
                 toast({
                     title: "Deleted",
@@ -88,7 +88,8 @@ export default function LabsPage() {
 
         try {
             if (editingId) {
-                // Update existing - implement when API is available
+                // Update existing
+                await updateLab(editingId, formData);
                 setLabs(labs.map(lab =>
                     lab.id === editingId
                         ? { ...lab, ...formData }

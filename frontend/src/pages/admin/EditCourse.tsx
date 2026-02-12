@@ -37,10 +37,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 
 import { getCategories } from "@/api/categories";
-import { getLabs } from "@/api/labs";
-import { getCourseDetails } from "@/api/courses";
-import { createCourse, updateCourse } from "@/api/courses";
-import { updateVideo } from "@/api/videos";
+import { getLabs, getLabsForCourse, assignLabToCourse } from "@/api/labs";
+import { getCourseDetails, updateCourse, createCourse } from "@/api/courses";
+import { createTopic } from "@/api/topics";
+import { createVideo, updateVideo } from "@/api/videos";
+import { QuizBuilder } from "@/components/admin/quiz-builder";
 import api from "@/api/axios";
 // import { updateCourse } from "@/api/courses.api"; // wire later
 
@@ -73,6 +74,8 @@ export default function EditCoursePage() {
   const [selectedLabs, setSelectedLabs] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
+  const [quizTopic, setQuizTopic] = useState<any | null>(null);
+  const [isQuizBuilderOpen, setIsQuizBuilderOpen] = useState(false);
 
   /* ------------------ load initial data ------------------ */
   useEffect(() => {
@@ -80,14 +83,19 @@ export default function EditCoursePage() {
   }, []);
 
   const loadInitialData = async () => {
-    const [catRes, labRes, courseRes] = await Promise.all([
+    const [catRes, labRes, courseRes, assignedLabsRes] = await Promise.all([
       getCategories(),
       getLabs(),
       getCourseDetails(id!),
+      getLabsForCourse(id!),
     ]);
 
     setCategories(Array.isArray(catRes.data) ? catRes.data : []);
     setLabs(Array.isArray(labRes.data) ? labRes.data : []);
+
+    if (Array.isArray(assignedLabsRes.data)) {
+      setSelectedLabs(assignedLabsRes.data.map((l: any) => l.id));
+    }
 
     if (courseRes.data) {
       setCourse({
@@ -97,121 +105,83 @@ export default function EditCoursePage() {
       });
       // Load topics for this course if available
       if (courseRes.data.topics) {
-        setTopics(courseRes.data.topics);
+        setTopics(courseRes.data.topics.map((t: any) => ({
+          ...t,
+          videoUrl: t.video_url, // Alias for UI consistency
+          videoId: t.video_id,
+          showVideoSection: false
+        })));
       }
     }
   };
 
   /* ------------------ topic handlers ------------------ */
-  const handleAddTopic = () => {
-    setTopics([
-      ...topics,
-      {
-        id: Date.now(),
+  const handleAddTopic = async () => {
+    try {
+      const res = await createTopic({
         title: "New Topic",
-        video: false,
-        quiz: false,
+        courseId: id!,
+        orderIndex: topics.length,
+      });
+
+      const newTopic = {
+        ...res.data,
         videoUrl: "",
         videoId: undefined,
-        quizDraftQuestion: "",
-        quizDraftOptions: ["", "", "", ""],
-        quizDraftCorrectIndex: 0,
-        quizQuestions: [],
-      },
-    ]);
+        showVideoSection: false
+      };
+
+      setTopics([...topics, newTopic]);
+    } catch (e) {
+      console.error("Failed to create topic:", e);
+      alert("Failed to create topic.");
+    }
   };
 
-  const toggleTopicItem = (id: number, type: "video" | "quiz") => {
-    setTopics(
-      topics.map((t) =>
-        t.id === id ? { ...t, [type]: !t[type] } : t
-      )
-    );
+  const removeTopic = (topicId: string) => {
+    // Since there's no delete API yet, we just remove it from the local list
+    // In a real app, we'd need a delete endpoint.
+    if (confirm("Remove topic from this session? (Note: No delete API detected)")) {
+      setTopics(topics.filter((t) => t.id !== topicId));
+    }
   };
 
-  const updateTopic = (id: number, patch: Record<string, any>) => {
+  const updateTopicLocal = (id: string, patch: Record<string, any>) => {
     setTopics(topics.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   };
 
-  const addQuizQuestion = (id: number) => {
-    const topic = topics.find((t) => t.id === id);
-    if (!topic) return;
-
-    const questionText = (topic.quizDraftQuestion || "").trim();
-    const options = Array.isArray(topic.quizDraftOptions) ? topic.quizDraftOptions : [];
-    const correctIndexRaw = Number(topic.quizDraftCorrectIndex);
-    const cleanedOptionsWithIndex = options
-      .map((o: string, idx: number) => ({ text: (o || "").trim(), idx }))
-      .filter((o: { text: string; idx: number }) => Boolean(o.text));
-
-    if (!questionText || cleanedOptionsWithIndex.length < 2) return;
-
-    const correctIdxInCleaned = cleanedOptionsWithIndex.findIndex(
-      (o: { text: string; idx: number }) => o.idx === correctIndexRaw
-    );
-
-    if (correctIdxInCleaned < 0) return;
-
-    const cleanedOptions = cleanedOptionsWithIndex.map((o: { text: string; idx: number }) => o.text);
-
-    const next = {
-      id: Date.now(),
-      text: questionText,
-      options: cleanedOptions,
-      correctIndex: correctIdxInCleaned,
-    };
-
-    updateTopic(id, {
-      quizQuestions: [...(topic.quizQuestions || []), next],
-      quizDraftQuestion: "",
-      quizDraftOptions: ["", "", "", ""],
-      quizDraftCorrectIndex: 0,
-    });
+  const saveTopicTitle = async (topicId: string, title: string) => {
+    // User mentioned there's no topic update API, so we skip this for now
+    console.log("Topic title updated locally:", title);
   };
 
-  const handleTopicVideoUpload = async (topicId: number, file: File) => {
-    updateTopic(topicId, { uploading: true, uploadProgress: 0, uploadError: "" });
+  const saveTopicVideoUrl = async (topicId: string, url: string) => {
+    if (!url) return;
+    updateTopicLocal(topicId, { uploading: true, uploadError: "" });
     try {
-      const url = prompt("Paste the video URL (YouTube, CDN, or hosted file):");
-      if (!url) {
-        updateTopic(topicId, { uploading: false, uploadProgress: 0, uploadError: "Upload cancelled." });
-        return;
-      }
-
       const topic = topics.find(t => t.id === topicId);
-
       if (topic?.videoId) {
-        // Update existing video via PUT /api/video/:id
-        await updateVideo(topic.videoId, { title: file.name, url });
+        await updateVideo(topic.videoId, { title: topic.title + " Video", url });
       } else {
-        // Create new video record (assuming POST /video returns the new record)
-        const { data: newVideo } = await api.post("/video", {
-          title: file.name,
+        const { data: newVideo } = await createVideo({
+          title: topic?.title + " Video",
           url,
           courseId: id!,
+          topicId: topicId,
         });
-        updateTopic(topicId, { videoId: newVideo.id });
+        updateTopicLocal(topicId, { videoId: newVideo.id });
       }
-
-      updateTopic(topicId, {
-        uploading: false,
-        uploadProgress: 100,
-        videoUrl: url,
-        videoFileName: file.name,
-        uploadError: "",
-      });
+      updateTopicLocal(topicId, { uploading: false, videoUrl: url });
+      alert("Video URL saved!");
     } catch (e: any) {
-      updateTopic(topicId, {
+      updateTopicLocal(topicId, {
         uploading: false,
-        uploadProgress: 0,
         uploadError: e?.response?.data?.message || e?.message || "Failed to save video URL.",
       });
     }
   };
 
-  const removeTopic = (id: number) => {
-    setTopics(topics.filter((t) => t.id !== id));
-  };
+  // removeTopicAlias was redundant, removed.
 
   /* ------------------ labs ------------------ */
   const toggleLab = (labId: string) => {
@@ -222,14 +192,6 @@ export default function EditCoursePage() {
     );
   };
 
-  const saveTopicsToBackend = async (topics: any[]) => {
-    try {
-      await api.put(`/courses/${id}/topics`, { topics });
-      console.log('Topics saved to backend');
-    } catch (e: any) {
-      console.error('Failed to save topics:', e);
-    }
-  };
 
   const handleSave = async () => {
     if (!course.title.trim() || !course.description.trim() || !course.categoryId) {
@@ -246,7 +208,7 @@ export default function EditCoursePage() {
 
       if (id) {
         await updateCourse(id, payload);
-        await saveTopicsToBackend(topics);
+        await assignLabToCourse(id, selectedLabs);
         alert('Course updated successfully.');
       } else {
         await createCourse(payload);
@@ -324,180 +286,107 @@ export default function EditCoursePage() {
               {topics.map((topic) => (
                 <div key={topic.id} className="mb-3">
                   <div className="flex gap-3 items-center">
-                    <GripVertical />
+                    <GripVertical className="text-muted-foreground/30" />
                     <Input
                       value={topic.title}
+                      className="font-bold border-2 focus-visible:ring-primary/20"
                       onChange={(e) =>
-                        setTopics(
-                          topics.map((t) =>
-                            t.id === topic.id
-                              ? { ...t, title: e.target.value }
-                              : t
-                          )
-                        )
+                        updateTopicLocal(topic.id, { title: e.target.value })
                       }
+                      onBlur={(e) => saveTopicTitle(topic.id, e.target.value)}
                     />
                     <Button
                       size="sm"
-                      variant={topic.video ? "default" : "outline"}
-                      onClick={() => toggleTopicItem(topic.id, "video")}
+                      variant={topic.videoUrl ? "default" : "outline"}
+                      className={cn("gap-2", topic.videoUrl ? "bg-primary text-primary-foreground" : "")}
+                      onClick={() => updateTopicLocal(topic.id, { showVideoSection: !topic.showVideoSection })}
                     >
-                      <Video />
+                      <Video className="h-4 w-4" />
+                      {topic.videoUrl ? "VIDEO SET" : "ADD VIDEO"}
                     </Button>
                     <Button
                       size="sm"
-                      variant={topic.quiz ? "default" : "outline"}
-                      onClick={() => toggleTopicItem(topic.id, "quiz")}
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => {
+                        setQuizTopic(topic);
+                        setIsQuizBuilderOpen(true);
+                      }}
                     >
-                      <FileQuestion />
+                      <FileQuestion className="h-4 w-4" />
+                      QUIZ
                     </Button>
                     <Button
                       size="icon"
                       variant="ghost"
+                      className="text-destructive hover:bg-destructive/10"
                       onClick={() => removeTopic(topic.id)}
                     >
-                      <Trash2 />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
 
-                  {topic.video ? (
-                    <div className="mt-3 rounded-md border p-4 space-y-3">
+                  {topic.showVideoSection ? (
+                    <div className="mt-3 rounded-md border p-4 space-y-4 bg-muted/5">
                       <div className="space-y-2">
-                        <Label>Upload Video</Label>
-                        <Input
-                          type="file"
-                          accept="video/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            handleTopicVideoUpload(topic.id, file);
-                          }}
-                        />
-                      </div>
-
-                      {topic.uploading ? (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-sm font-bold">
-                            <Loader2 className="h-4 w-4 animate-spin" /> Uploading {topic.uploadProgress || 0}%
-                          </div>
-                          <div className="h-2 w-full bg-foreground/10 border border-foreground overflow-hidden">
-                            <div
-                              className="h-full bg-primary transition-all duration-300"
-                              style={{ width: `${topic.uploadProgress || 0}%` }}
-                            />
-                          </div>
+                        <Label className="text-xs uppercase font-black">Video Resource URL</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="https://supabase-url.mp4"
+                            value={topic.videoUrl || ""}
+                            onChange={(e) => updateTopicLocal(topic.id, { videoUrl: e.target.value })}
+                            className="bg-background"
+                          />
+                          <Button
+                            size="sm"
+                            disabled={topic.uploading}
+                            onClick={() => saveTopicVideoUrl(topic.id, topic.videoUrl)}
+                          >
+                            {topic.uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : "APPLY"}
+                          </Button>
                         </div>
-                      ) : null}
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">
+                          Direct links to MP4, YouTube, or HLS streams supported.
+                        </p>
+                      </div>
 
                       {topic.uploadError ? (
                         <div className="text-sm font-bold text-destructive">{topic.uploadError}</div>
                       ) : null}
 
-                      {topic.videoUrl && !topic.uploading ? (
-                        <div className="text-sm font-bold">Uploaded: {topic.videoFileName || "video"}</div>
-                      ) : null}
+                      {topic.videoId && (
+                        <div className="flex items-center gap-2 text-xs font-black text-green-600 bg-green-50 w-fit px-2 py-1 rounded">
+                          <Check className="h-3 w-3" /> VIDEO LINKED
+                        </div>
+                      )}
                     </div>
                   ) : null}
 
-                  {topic.quiz ? (
-                    <div className="mt-3 rounded-md border p-4 space-y-4">
-                      <div className="space-y-2">
-                        <Label>New Question</Label>
-                        <Input
-                          value={topic.quizDraftQuestion || ""}
-                          onChange={(e) =>
-                            updateTopic(topic.id, { quizDraftQuestion: e.target.value })
-                          }
-                          placeholder="Question text"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Options (select correct)</Label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {(Array.isArray(topic.quizDraftOptions)
-                            ? topic.quizDraftOptions
-                            : ["", "", "", ""]).map((opt: string, idx: number) => {
-                            const isCorrect = Number(topic.quizDraftCorrectIndex || 0) === idx;
-
-                            return (
-                              <div
-                                key={idx}
-                                className={cn(
-                                  "flex items-center gap-2 rounded-md border p-2",
-                                  isCorrect ? "border-green-600 bg-green-50" : ""
-                                )}
-                              >
-                                <input
-                                  type="radio"
-                                  name={`correct-${topic.id}`}
-                                  checked={isCorrect}
-                                  onChange={() =>
-                                    updateTopic(topic.id, { quizDraftCorrectIndex: idx })
-                                  }
-                                />
-                                <Input
-                                  value={opt}
-                                  onChange={(e) => {
-                                    const next = Array.isArray(topic.quizDraftOptions)
-                                      ? [...topic.quizDraftOptions]
-                                      : ["", "", "", ""];
-                                    next[idx] = e.target.value;
-                                    updateTopic(topic.id, { quizDraftOptions: next });
-                                  }}
-                                  placeholder={`Option ${idx + 1}`}
-                                  className={cn(isCorrect ? "border-green-600" : "")}
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      <div>
-                        <Button
-                          size="sm"
-                          onClick={() => addQuizQuestion(topic.id)}
-                          disabled={
-                            !(topic.quizDraftQuestion || "").trim() ||
-                            (Array.isArray(topic.quizDraftOptions)
-                              ? topic.quizDraftOptions.filter((o: string) => (o || "").trim()).length
-                              : 0) < 2
-                          }
-                        >
-                          <Plus className="h-3 w-3 mr-1" /> Add Question
-                        </Button>
-                      </div>
-
-                      {Array.isArray(topic.quizQuestions) && topic.quizQuestions.length ? (
-                        <div className="space-y-3">
-                          {topic.quizQuestions.map((q: any) => (
-                            <div key={q.id} className="rounded-md border p-3">
-                              <div className="font-bold">{q.text}</div>
-                              <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {(Array.isArray(q.options) ? q.options : []).map((o: string, i: number) => {
-                                  const isCorrect = Number(q.correctIndex) === i;
-                                  return (
-                                    <div
-                                      key={i}
-                                      className={cn(
-                                        "text-sm rounded-md border px-2 py-1",
-                                        isCorrect ? "border-green-600 bg-green-50 font-bold" : ""
-                                      )}
-                                    >
-                                      {o}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
                 </div>
               ))}
+              {topics.length === 0 && (
+                <div className="py-20 border-2 border-dashed border-foreground/10 rounded-xl flex flex-col items-center justify-center text-muted-foreground">
+                  <p className="font-bold uppercase tracking-widest text-xs">No topics added yet</p>
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          {/* Quiz Builder Integration */}
+          {quizTopic && (
+            <QuizBuilder
+              topic={{
+                id: quizTopic.id,
+                title: quizTopic.title,
+                course_id: id!
+              }}
+              open={isQuizBuilderOpen}
+              onOpenChange={setIsQuizBuilderOpen}
+              onSuccess={() => {
+                console.log("Quiz updated for topic:", quizTopic.id);
+              }}
+            />
+          )}
         </div>
 
         {/* RIGHT */}

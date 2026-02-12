@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getQuizByTopic, submitQuiz } from '@/api/quiz'
 import { getCourseDetails as fetchCourseDetails } from '@/api/courses'
 import { TopicQuizModal } from '@/components/course/topic-quiz-modal'
+import { enrollCourse, getMyEnrollments } from '@/api/enrollments'
 
 interface Topic {
     id: string;
@@ -46,6 +47,19 @@ export default function CoursePlayerPage() {
             setLoading(true);
             try {
                 if (!courseId) return;
+
+                // Ensure user is enrolled
+                try {
+                    const enrollmentsRes = await getMyEnrollments();
+                    const isEnrolled = Array.isArray(enrollmentsRes.data) &&
+                        enrollmentsRes.data.some((e: any) => e.course_id === courseId);
+                    if (!isEnrolled) {
+                        await enrollCourse(courseId);
+                    }
+                } catch (e) {
+                    console.error("Enrollment check failed:", e);
+                }
+
                 const res = await fetchCourseDetails(courseId);
                 console.log("Fetched course topics:", res.data); // DEBUG
                 const topicsRaw = Array.isArray(res.data.topics) ? res.data.topics : [];
@@ -224,9 +238,7 @@ export default function CoursePlayerPage() {
                                     key={currentTopic.id}
                                     ref={videoRef}
                                     // Method A: Direct Stream from Express Backend
-                                    // Assumes Express is running on port 4000. 
-                                    // In production, use an environment variable like import.meta.env.VITE_STREAM_URL
-                                    src={`http://localhost:4000/api/video?topicId=${currentTopic.id}`}
+                                    src={`/api/video?topicId=${currentTopic.id}`}
                                     controls
                                     className="w-full h-full object-cover"
                                     onEnded={handleVideoEnd}
@@ -234,7 +246,7 @@ export default function CoursePlayerPage() {
                                     playsInline
                                     preload="metadata"
                                 >
-                                    <source src={`http://localhost:4000/api/video?topicId=${currentTopic.id}`} type="video/mp4" />
+                                    <source src={`/api/video?topicId=${currentTopic.id}`} type="video/mp4" />
                                     Your browser does not support the video tag.
                                 </video>
                             ) : (
