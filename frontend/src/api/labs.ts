@@ -2,8 +2,6 @@ import api from "./axios";
 
 export const getLabs = () => api.get("/labs");
 
-export const getLabById = (id: string) =>
-  api.get(`/labs/${id}`);
 
 export const createLab = (data: { name: string; code: string; description: string }) =>
   api.post("/labs", data);

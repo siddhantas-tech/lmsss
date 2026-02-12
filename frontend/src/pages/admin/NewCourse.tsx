@@ -84,55 +84,60 @@ export default function NewCoursePage() {
 
   return (
     <main className="w-full max-w-2xl mx-auto px-8 py-12">
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <form onSubmit={handleSubmit} className="space-y-10">
         {/* Header */}
-        <div className="flex items-start gap-4 mb-8">
-          <Button asChild variant="ghost" size="icon">
+        <div className="flex items-start gap-4 mb-2">
+          <Button asChild variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-muted transition-all">
             <Link to="/admin/courses">
-              <ArrowLeft />
+              <ArrowLeft className="h-5 w-5" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-black uppercase">Create New Course</h1>
-            <p className="text-xs uppercase text-muted-foreground">
-              Add a new curriculum module
+            <h1 className="text-3xl font-black uppercase tracking-tighter leading-none">Assemble New Module</h1>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground mt-1">
+              Curriculum Architecture & Metadata
             </p>
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Course Details</CardTitle>
+        <Card className="border-2 border-border shadow-xl rounded-3xl overflow-hidden bg-card">
+          <CardHeader className="bg-muted/30 border-b pb-6">
+            <CardTitle className="text-xl font-black uppercase tracking-tight">Core Configuration</CardTitle>
+            <p className="text-[10px] text-muted-foreground font-bold uppercase">Define the foundational properties of this course</p>
           </CardHeader>
 
-          <CardContent className="space-y-6">
+          <CardContent className="p-8 space-y-8">
             {/* Title */}
-            <div className="space-y-2">
-              <Label>Course Title</Label>
+            <div className="space-y-3">
+              <Label className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">Course Designation</Label>
               <Input
                 value={formData.title}
                 onChange={(e) =>
                   setFormData({ ...formData, title: e.target.value })
                 }
+                placeholder="e.g., Advanced Additive Manufacturing"
+                className="text-lg font-bold border-2 focus-visible:border-primary transition-all h-12 rounded-xl"
                 required
               />
             </div>
 
             {/* Description */}
-            <div className="space-y-2">
-              <Label>Description</Label>
+            <div className="space-y-3">
+              <Label className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">Module Abstract</Label>
               <Textarea
                 value={formData.description}
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
                 }
+                placeholder="Briefly describe the learning objectives..."
+                className="min-h-[120px] font-medium border-2 focus-visible:border-primary transition-all rounded-xl"
                 required
               />
             </div>
 
             {/* Category */}
-            <div className="space-y-2">
-              <Label>Category</Label>
+            <div className="space-y-3">
+              <Label className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">Functional Group</Label>
               <Select
                 value={formData.category}
                 onValueChange={(value) =>
@@ -140,18 +145,18 @@ export default function NewCoursePage() {
                 }
                 disabled={loadingCategories}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-12 border-2 font-bold rounded-xl focus:border-primary transition-all">
                   <SelectValue
                     placeholder={
                       loadingCategories
-                        ? "Loading categories..."
-                        : "Select a category"
+                        ? "Synchronizing categories..."
+                        : "Select classification"
                     }
                   />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl border-2">
                   {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
+                    <SelectItem key={category.id} value={category.id} className="font-bold py-3">
                       {category.name}
                     </SelectItem>
                   ))}
@@ -160,12 +165,12 @@ export default function NewCoursePage() {
             </div>
           </CardContent>
 
-          <CardFooter className="flex gap-4">
-            <Button asChild variant="outline" className="flex-1">
-              <Link to="/admin/courses">Cancel</Link>
+          <CardFooter className="p-8 bg-muted/10 flex gap-4 border-t">
+            <Button asChild variant="outline" className="h-12 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all hover:bg-muted">
+              <Link to="/admin/courses">Discard</Link>
             </Button>
-            <Button type="submit" className="flex-[2]" disabled={submitting}>
-              {submitting ? 'Creating...' : 'CREATE COURSE'}
+            <Button type="submit" className="flex-1 h-12 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg transition-all hover:translate-y-[-2px] active:translate-y-0" disabled={submitting}>
+              {submitting ? 'Initializing...' : 'GENERATE COURSE'}
             </Button>
           </CardFooter>
         </Card>

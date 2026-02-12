@@ -89,42 +89,42 @@ export default function AdminCoursesList() {
             </div>
 
             {/* Courses Table */}
-            <Card className="border-2 border-foreground rounded-3xl bg-card shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] overflow-hidden">
+            <Card className="border-2 border-border rounded-3xl bg-card shadow-sm overflow-hidden">
                 <CardContent className="p-0">
                     <Table>
-                        <TableHeader className="bg-muted/5 border-b-2 border-foreground/10">
+                        <TableHeader className="bg-muted/30 border-b-2 border-border">
                             <TableRow className="hover:bg-transparent border-none">
-                                <TableHead className="h-10 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Course</TableHead>
-                                <TableHead className="h-10 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Description</TableHead>
-                                <TableHead className="h-10 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Actions</TableHead>
+                                <TableHead className="h-12 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Course</TableHead>
+                                <TableHead className="h-12 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Description</TableHead>
+                                <TableHead className="h-12 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {filteredCourses.length > 0 ? (
                                 filteredCourses.map((course) => (
-                                    <TableRow key={course.id} className="hover:bg-muted/5 border-b border-foreground/5 last:border-0 group">
-                                        <TableCell className="px-6 py-2.5 font-bold">
+                                    <TableRow key={course.id} className="hover:bg-primary/[0.02] border-b border-border last:border-0 group transition-colors">
+                                        <TableCell className="px-6 py-4 font-bold">
                                             <div className="flex items-center gap-3">
-                                                <div className="h-7 w-7 rounded-md bg-primary/10 flex items-center justify-center font-black text-[10px] border border-primary/20 text-primary">
-                                                    <BookOpen className="h-3.5 w-3.5" />
+                                                <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center font-black text-[10px] border border-primary/20 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+                                                    <BookOpen className="h-4 w-4" />
                                                 </div>
-                                                <span className="text-sm">{course.title}</span>
+                                                <span className="text-sm tracking-tight">{course.title}</span>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="px-6 py-2.5 text-xs text-muted-foreground">
+                                        <TableCell className="px-6 py-4 text-xs text-muted-foreground max-w-md truncate">
                                             {course.description || "-"}
                                         </TableCell>
-                                        <TableCell className="px-6 py-2.5 text-right">
-                                            <div className="flex items-center justify-end gap-1">
+                                        <TableCell className="px-6 py-4 text-right">
+                                            <div className="flex items-center justify-end gap-2">
                                                 <Link to={`/admin/courses/edit/${course.id}`}>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-muted rounded-full">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted rounded-xl transition-all hover:scale-105 active:scale-95">
                                                         <Pencil className="h-3.5 w-3.5" />
                                                     </Button>
                                                 </Link>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="h-7 w-7 hover:bg-destructive/10 hover:text-destructive rounded-full"
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive rounded-xl transition-all hover:scale-105 active:scale-95"
                                                     onClick={() => handleDelete(course.id)}
                                                 >
                                                     <Trash2 className="h-3.5 w-3.5" />
@@ -135,8 +135,11 @@ export default function AdminCoursesList() {
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
-                                        No courses found
+                                    <TableCell colSpan={3} className="text-center py-16 text-muted-foreground bg-muted/5">
+                                        <div className="flex flex-col items-center gap-2 opacity-40">
+                                            <BookOpen className="h-8 w-8 mb-2" />
+                                            <p className="font-black uppercase tracking-widest text-[10px]">No curriculum components found</p>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             )}

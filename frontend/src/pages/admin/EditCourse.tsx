@@ -117,9 +117,12 @@ export default function EditCoursePage() {
 
   /* ------------------ topic handlers ------------------ */
   const handleAddTopic = async () => {
+    const title = window.prompt("Enter topic title:", "New Topic");
+    if (!title || !title.trim()) return;
+
     try {
       const res = await createTopic({
-        title: "New Topic",
+        title: title.trim(),
         courseId: id!,
         orderIndex: topics.length,
       });
@@ -275,98 +278,126 @@ export default function EditCoursePage() {
           </Card>
 
           {/* Topics */}
-          <Card>
-            <CardHeader className="flex justify-between flex-row">
-              <CardTitle>Topics</CardTitle>
-              <Button size="sm" onClick={handleAddTopic}>
-                <Plus className="h-3 w-3 mr-1" /> Add Topic
+          <Card className="border-2 shadow-sm">
+            <CardHeader className="flex justify-between flex-row items-center border-b bg-muted/30 pb-4">
+              <div>
+                <CardTitle className="text-xl font-black uppercase tracking-tight">Curriculum</CardTitle>
+                <p className="text-[10px] uppercase text-muted-foreground font-bold">Manage your course topics and resources</p>
+              </div>
+              <Button size="sm" onClick={handleAddTopic} className="gap-2 font-bold shadow-lg transition-transform hover:scale-105 active:scale-95">
+                <Plus className="h-4 w-4" /> ADD TOPIC
               </Button>
             </CardHeader>
-            <CardContent>
-              {topics.map((topic) => (
-                <div key={topic.id} className="mb-3">
-                  <div className="flex gap-3 items-center">
-                    <GripVertical className="text-muted-foreground/30" />
-                    <Input
-                      value={topic.title}
-                      className="font-bold border-2 focus-visible:ring-primary/20"
-                      onChange={(e) =>
-                        updateTopicLocal(topic.id, { title: e.target.value })
-                      }
-                      onBlur={(e) => saveTopicTitle(topic.id, e.target.value)}
-                    />
-                    <Button
-                      size="sm"
-                      variant={topic.videoUrl ? "default" : "outline"}
-                      className={cn("gap-2", topic.videoUrl ? "bg-primary text-primary-foreground" : "")}
-                      onClick={() => updateTopicLocal(topic.id, { showVideoSection: !topic.showVideoSection })}
-                    >
-                      <Video className="h-4 w-4" />
-                      {topic.videoUrl ? "VIDEO SET" : "ADD VIDEO"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-2"
-                      onClick={() => {
-                        setQuizTopic(topic);
-                        setIsQuizBuilderOpen(true);
-                      }}
-                    >
-                      <FileQuestion className="h-4 w-4" />
-                      QUIZ
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="text-destructive hover:bg-destructive/10"
-                      onClick={() => removeTopic(topic.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  {topic.showVideoSection ? (
-                    <div className="mt-3 rounded-md border p-4 space-y-4 bg-muted/5">
-                      <div className="space-y-2">
-                        <Label className="text-xs uppercase font-black">Video Resource URL</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="https://supabase-url.mp4"
-                            value={topic.videoUrl || ""}
-                            onChange={(e) => updateTopicLocal(topic.id, { videoUrl: e.target.value })}
-                            className="bg-background"
-                          />
-                          <Button
-                            size="sm"
-                            disabled={topic.uploading}
-                            onClick={() => saveTopicVideoUrl(topic.id, topic.videoUrl)}
-                          >
-                            {topic.uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : "APPLY"}
-                          </Button>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground uppercase font-bold">
-                          Direct links to MP4, YouTube, or HLS streams supported.
-                        </p>
+            <CardContent className="pt-6">
+              <div className="space-y-4">
+                {topics.map((topic, index) => (
+                  <div
+                    key={topic.id}
+                    className="group relative rounded-xl border-2 border-border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-md dark:hover:bg-accent/5"
+                  >
+                    <div className="flex gap-4 items-center">
+                      <div className="flex flex-col items-center gap-1 text-muted-foreground/30 group-hover:text-primary/40 transition-colors">
+                        <GripVertical className="h-5 w-5 cursor-grab active:cursor-grabbing" />
+                        <span className="text-[10px] font-black">{index + 1}</span>
                       </div>
 
-                      {topic.uploadError ? (
-                        <div className="text-sm font-bold text-destructive">{topic.uploadError}</div>
-                      ) : null}
-
-                      {topic.videoId && (
-                        <div className="flex items-center gap-2 text-xs font-black text-green-600 bg-green-50 w-fit px-2 py-1 rounded">
-                          <Check className="h-3 w-3" /> VIDEO LINKED
+                      <div className="flex-1 space-y-1">
+                        <Input
+                          value={topic.title}
+                          className="font-bold text-lg border-none bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-auto"
+                          onChange={(e) =>
+                            updateTopicLocal(topic.id, { title: e.target.value })
+                          }
+                          onBlur={(e) => saveTopicTitle(topic.id, e.target.value)}
+                          placeholder="Untitled Topic"
+                        />
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className={cn(
+                              "h-7 px-2 text-[10px] font-black uppercase tracking-wider transition-all",
+                              topic.videoUrl
+                                ? "bg-primary/10 text-primary hover:bg-primary/20"
+                                : "text-muted-foreground hover:bg-muted"
+                            )}
+                            onClick={() => updateTopicLocal(topic.id, { showVideoSection: !topic.showVideoSection })}
+                          >
+                            <Video className="h-3 w-3 mr-1.5" />
+                            {topic.videoUrl ? "VIDEO LINKED" : "ADD VIDEO"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:bg-muted"
+                            onClick={() => {
+                              setQuizTopic(topic);
+                              setIsQuizBuilderOpen(true);
+                            }}
+                          >
+                            <FileQuestion className="h-3 w-3 mr-1.5" />
+                            QUIZ
+                          </Button>
                         </div>
-                      )}
-                    </div>
-                  ) : null}
+                      </div>
 
-                </div>
-              ))}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
+                          onClick={() => removeTopic(topic.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {topic.showVideoSection ? (
+                      <div className="mt-4 rounded-lg border bg-muted/30 p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">Video Content URL</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="https://example.com/video.mp4"
+                              value={topic.videoUrl || ""}
+                              onChange={(e) => updateTopicLocal(topic.id, { videoUrl: e.target.value })}
+                              className="bg-background border-2 focus-visible:border-primary transition-colors"
+                            />
+                            <Button
+                              size="sm"
+                              disabled={topic.uploading}
+                              onClick={() => saveTopicVideoUrl(topic.id, topic.videoUrl)}
+                              className="font-bold px-4"
+                            >
+                              {topic.uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : "APPLY"}
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground font-medium italic">
+                            Supports MP4, YouTube, and HLS streaming links.
+                          </p>
+                        </div>
+
+                        {topic.uploadError ? (
+                          <div className="text-xs font-bold text-destructive bg-destructive/10 p-2 rounded border border-destructive/20">{topic.uploadError}</div>
+                        ) : null}
+
+                        {topic.videoId && (
+                          <div className="flex items-center gap-2 text-[10px] font-black text-emerald-500 bg-emerald-500/10 w-fit px-2.5 py-1 rounded-full border border-emerald-500/20">
+                            <Check className="h-3 w-3" /> ATTACHED
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
               {topics.length === 0 && (
-                <div className="py-20 border-2 border-dashed border-foreground/10 rounded-xl flex flex-col items-center justify-center text-muted-foreground">
-                  <p className="font-bold uppercase tracking-widest text-xs">No topics added yet</p>
+                <div className="py-16 border-2 border-dashed border-border rounded-2xl flex flex-col items-center justify-center text-muted-foreground bg-muted/10">
+                  <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                    <Plus className="h-6 w-6 opacity-20" />
+                  </div>
+                  <p className="font-bold uppercase tracking-widest text-[10px]">No curriculum items created</p>
                 </div>
               )}
             </CardContent>
