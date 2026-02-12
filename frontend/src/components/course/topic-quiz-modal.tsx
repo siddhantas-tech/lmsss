@@ -4,11 +4,16 @@ import { Button } from '@/components/ui/Button'
 import { CheckCircle2, AlertCircle, Send } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+interface QuizOption {
+    id: string;
+    text: string;
+}
+
 interface QuizQuestion {
     id: string;
     question: string;
-    options: string[];
-    correctAnswer: number;
+    options: QuizOption[];
+    correctAnswerIndex: number;
 }
 
 interface TopicQuizModalProps {
@@ -16,26 +21,28 @@ interface TopicQuizModalProps {
     topicTitle: string;
     questions: QuizQuestion[];
     onClose: () => void;
-    onSubmit: (score: number) => void;
+    onSubmit: (score: number, answers: Record<string, string>) => void;
 }
 
 export function TopicQuizModal({ isOpen, topicTitle, questions, onClose, onSubmit }: TopicQuizModalProps) {
-    const [answers, setAnswers] = useState<Record<number, number>>({})
+    const [answers, setAnswers] = useState<Record<string, string>>({})
     const [submitted, setSubmitted] = useState(false)
     const [score, setScore] = useState(0)
 
-    const handleOptionSelect = (questionIndex: number, optionIndex: number) => {
+    const handleOptionSelect = (questionId: string, optionId: string) => {
         if (submitted) return
         setAnswers({
             ...answers,
-            [questionIndex]: optionIndex
+            [questionId]: optionId
         })
     }
 
     const handleSubmit = () => {
         let correctCount = 0
-        questions.forEach((q, idx) => {
-            if (answers[idx] === q.correctAnswer) {
+        questions.forEach((q) => {
+            const selectedOptionId = answers[q.id];
+            const correctOption = q.options[q.correctAnswerIndex];
+            if (selectedOptionId === correctOption.id) {
                 correctCount++
             }
         })
@@ -45,7 +52,7 @@ export function TopicQuizModal({ isOpen, topicTitle, questions, onClose, onSubmi
     }
 
     const handleFinish = () => {
-        onSubmit(score)
+        onSubmit(score, answers)
         // Reset state for next time
         setAnswers({})
         setSubmitted(false)
@@ -72,18 +79,18 @@ export function TopicQuizModal({ isOpen, topicTitle, questions, onClose, onSubmi
                                     {q.question}
                                 </h3>
                                 <div className="grid gap-3">
-                                    {q.options.map((opt, oIdx) => (
+                                    {q.options.map((opt) => (
                                         <button
-                                            key={oIdx}
-                                            onClick={() => handleOptionSelect(qIdx, oIdx)}
+                                            key={opt.id}
+                                            onClick={() => handleOptionSelect(q.id, opt.id)}
                                             className={cn(
                                                 "text-left p-4 rounded-xl border-4 font-bold transition-all",
-                                                answers[qIdx] === oIdx
+                                                answers[q.id] === opt.id
                                                     ? "bg-primary border-foreground text-primary-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-x-1 translate-y-1"
                                                     : "bg-muted/10 border-transparent hover:border-foreground/20"
                                             )}
                                         >
-                                            {opt}
+                                            {opt.text}
                                         </button>
                                     ))}
                                 </div>

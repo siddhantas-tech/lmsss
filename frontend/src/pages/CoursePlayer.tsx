@@ -3,7 +3,7 @@ import { Play, CheckCircle, Clock, Lock, ArrowLeft } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { getQuizByTopic } from '@/api/quiz'
+import { getQuizByTopic, submitQuiz } from '@/api/quiz'
 import { getCourseDetails as fetchCourseDetails } from '@/api/courses'
 import { TopicQuizModal } from '@/components/course/topic-quiz-modal'
 
@@ -19,11 +19,16 @@ interface Topic {
     questions: QuizQuestion[];
 }
 
+interface QuizOption {
+    id: string;
+    text: string;
+}
+
 interface QuizQuestion {
     id: string;
     question: string;
-    options: string[];
-    correctAnswer: number;
+    options: QuizOption[];
+    correctAnswerIndex: number;
 }
 
 export default function CoursePlayerPage() {
@@ -55,8 +60,11 @@ export default function CoursePlayerPage() {
                             questions = quizData.map((q: any) => ({
                                 id: q.id,
                                 question: q.question_text,
-                                options: Array.isArray(q.options) ? q.options.map((opt: any) => opt.option_text) : [],
-                                correctAnswer: Array.isArray(q.options) ? q.options.findIndex((opt: any) => opt.is_correct) : 0,
+                                options: Array.isArray(q.options) ? q.options.map((opt: any) => ({
+                                    id: opt.id,
+                                    text: opt.option_text
+                                })) : [],
+                                correctAnswerIndex: Array.isArray(q.options) ? q.options.findIndex((opt: any) => opt.is_correct) : 0,
                             }));
                         } catch (e) {
                             // No quiz for this topic
@@ -132,28 +140,50 @@ export default function CoursePlayerPage() {
         }
     }
 
-    const handleQuizSubmit = async (score: number) => {
-        if (score >= 70) {
-            const currentIndex = topics.findIndex(t => t.id === currentTopicId)
-            const newTopics = [...topics]
+    const handleQuizSubmit = async (score: number, answers: Record<string, string>) => {
+        try {
+            if (!courseId || !currentTopicId) return;
 
-            newTopics[currentIndex] = { ...newTopics[currentIndex], completed: true }
+            // Optional: Send to backend
+            const payload = {
+                topicId: currentTopicId,
+                courseId: courseId,
+                isFinalExam: false,
+                timeTaken: 0, // Could be tracked if needed
+                answers: Object.entries(answers).map(([questionId, selectedOptionId]) => ({
+                    questionId,
+                    selectedOptionId
+                }))
+            };
 
-            let nextTopicId = null
-            if (currentIndex + 1 < newTopics.length) {
-                newTopics[currentIndex + 1] = { ...newTopics[currentIndex + 1], isLocked: false }
-                nextTopicId = newTopics[currentIndex + 1].id
+            const res = await submitQuiz(payload);
+            const finalScore = res.data.score || score;
+
+            if (finalScore >= 70) {
+                const currentIndex = topics.findIndex(t => t.id === currentTopicId)
+                const newTopics = [...topics]
+
+                newTopics[currentIndex] = { ...newTopics[currentIndex], completed: true }
+
+                let nextTopicId = null
+                if (currentIndex + 1 < newTopics.length) {
+                    newTopics[currentIndex + 1] = { ...newTopics[currentIndex + 1], isLocked: false }
+                    nextTopicId = newTopics[currentIndex + 1].id
+                }
+
+                setTopics(newTopics)
+                setIsQuizOpen(false)
+
+                if (nextTopicId) {
+                    setCurrentTopicId(nextTopicId)
+                }
+            } else {
+                setIsQuizOpen(false)
             }
-
-            setTopics(newTopics)
-            setIsQuizOpen(false)
-
-            if (nextTopicId) {
-                setCurrentTopicId(nextTopicId)
-            }
-        } else {
-            // Logic for failed quiz handled in modal UI usually, but we close it here
-            setIsQuizOpen(false)
+        } catch (error) {
+            console.error("Failed to submit quiz:", error);
+            alert("Failed to submit quiz. Please try again.");
+            setIsQuizOpen(false);
         }
     }
 
