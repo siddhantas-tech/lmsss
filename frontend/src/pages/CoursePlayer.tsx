@@ -3,10 +3,11 @@ import { Play, CheckCircle, Clock, Lock, ArrowLeft } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { LessonQuizModal } from '@/components/course/lesson-quiz-modal'
 import { getQuizByTopic } from '@/api/quiz'
+import { getCourseDetails as fetchCourseDetails } from '@/api/courses'
+import { TopicQuizModal } from '@/components/course/topic-quiz-modal'
 
-interface Lesson {
+interface Topic {
     id: string;
     title: string;
     duration: number;
@@ -14,7 +15,7 @@ interface Lesson {
     isLocked: boolean;
     videoUrl: string;
     description: string;
-    topicId: string;
+    course_id: string;
     questions: QuizQuestion[];
 }
 
@@ -27,28 +28,28 @@ interface QuizQuestion {
 
 export default function CoursePlayerPage() {
     const { id: courseId } = useParams<{ id: string }>(); // Map 'id' from route to 'courseId' variable
-    const [topics, setTopics] = useState<Lesson[]>([]);
+    const [topics, setTopics] = useState<Topic[]>([]);
     const [currentTopicId, setCurrentTopicId] = useState<string | null>(null);
     const [showQuizPrompt, setShowQuizPrompt] = useState(false);
-    const [isQuizOpen, setIsQuizOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isQuizOpen, setIsQuizOpen] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
 
     useEffect(() => {
-        const fetchLessonsAndQuizzes = async () => {
+        const fetchTopicAndQuizzes = async () => {
             setLoading(true);
             try {
                 if (!courseId) return;
-                const res = await getLessonsByCourse(courseId);
-                console.log("Fetched lessons:", res.data); // DEBUG
-                const lessonsRaw = Array.isArray(res.data) ? res.data : [];
-                // lessonsRaw should be an array of lessons with topicId or id
-                const lessons: Lesson[] = await Promise.all(
-                    lessonsRaw.map(async (lesson: any, idx: number) => {
+                const res = await fetchCourseDetails(courseId);
+                console.log("Fetched course topics:", res.data); // DEBUG
+                const topicsRaw = Array.isArray(res.data.topics) ? res.data.topics : [];
+                // topicsRaw should be an array of topics
+                const Topic: Topic[] = await Promise.all(
+                    topicsRaw.map(async (topic: any, idx: number) => {
                         let questions: QuizQuestion[] = [];
                         try {
-                            const quizRes = await getQuizByTopic(lesson.id);
+                            const quizRes = await getQuizByTopic(topic.id);
                             // Map backend quiz format to QuizQuestion[]
                             const quizData = Array.isArray(quizRes.data?.questions) ? quizRes.data.questions : [];
                             questions = quizData.map((q: any) => ({
@@ -58,31 +59,31 @@ export default function CoursePlayerPage() {
                                 correctAnswer: Array.isArray(q.options) ? q.options.findIndex((opt: any) => opt.is_correct) : 0,
                             }));
                         } catch (e) {
-                            // No quiz for this lesson
+                            // No quiz for this topic
                         }
                         return {
-                            id: lesson.id,
-                            title: lesson.title,
-                            duration: lesson.video_duration_seconds || lesson.duration || 0,
+                            id: topic.id,
+                            title: topic.title,
+                            duration: topic.video_duration_seconds || topic.duration || 0,
                             completed: false,
-                            isLocked: idx !== 0, // Only first lesson unlocked
-                            videoUrl: lesson.video_url || '',
-                            description: lesson.description || '',
-                            topicId: lesson.id,
+                            isLocked: idx !== 0, // Only first topic unlocked
+                            videoUrl: topic.video_url || '',
+                            description: topic.description || '',
+                            topicId: topic.id,
                             questions,
                         };
                     })
                 );
-                setTopics(lessons);
-                setCurrentTopicId(lessons.length > 0 ? lessons[0].id : null);
+                setTopics(Topic);
+                setCurrentTopicId(Topic.length > 0 ? Topic[0].id : null);
             } catch (error: any) {
-                console.error("Error fetching lessons:", error);
-                setError(error.message || "Failed to load lessons");
+                console.error("Error fetching topics:", error);
+                setError(error.message || "Failed to load topics");
             } finally {
                 setLoading(false);
             }
         };
-        fetchLessonsAndQuizzes();
+        fetchTopicAndQuizzes();
     }, [courseId]);
 
     const currentTopic = topics.find((t) => t.id === currentTopicId)
@@ -209,7 +210,7 @@ export default function CoursePlayerPage() {
                             ) : (
                                 <div className="flex flex-col items-center justify-center text-white/50 gap-4">
                                     <Lock className="h-16 w-16" />
-                                    <p className="font-bold text-lg">Select a lesson to start</p>
+                                    <p className="font-bold text-lg">Select a topic to start</p>
                                 </div>
                             )}
                         </div>
@@ -317,9 +318,9 @@ export default function CoursePlayerPage() {
             </div>
 
             {currentTopic && (
-                <LessonQuizModal
+                <TopicQuizModal
                     isOpen={isQuizOpen}
-                    lessonTitle={currentTopic.title}
+                    topicTitle={currentTopic.title}
                     questions={currentTopic.questions || []}
                     onClose={() => setIsQuizOpen(false)}
                     onSubmit={handleQuizSubmit}

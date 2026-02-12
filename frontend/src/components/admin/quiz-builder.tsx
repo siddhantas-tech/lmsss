@@ -43,7 +43,7 @@ export function QuizBuilder({ topic, open, onOpenChange, onSuccess }: QuizBuilde
     const loadQuestions = async () => {
         setLoading(true)
         try {
-            // Backend expects topicId query param, but we were sending lessonId.
+            // Backend expects topicId query param.
             // Also need to map response back to component state.
             const res = await getQuizQuestions({ topicId: topic?.id })
 
