@@ -78,62 +78,46 @@ export default function CoursePlayerPage() {
                         // Fetch Quiz
                         let questions: QuizQuestion[] = []
                         try {
-                            console.log(`🔍 Fetching quiz for topic: ${topic.id} (${topic.title})`)
                             const quizRes = await getQuizByTopic(topic.id)
-                            console.log('📦 Raw quiz response:', quizRes)
-                            console.log('📦 Quiz response data:', quizRes.data)
-                            console.log('📦 Quiz response status:', quizRes.status)
 
                             // Try multiple possible response structures
                             let quizData = []
 
                             if (Array.isArray(quizRes.data)) {
-                                // Response is directly an array
-                                console.log('✓ Response is array')
                                 quizData = quizRes.data
                             } else if (quizRes.data?.questions) {
-                                // Response has questions property
-                                console.log('✓ Response has .questions property')
                                 quizData = quizRes.data.questions
                             } else if (quizRes.data?.data?.questions) {
-                                // Response nested in data.data.questions
-                                console.log('✓ Response nested in data.data.questions')
                                 quizData = quizRes.data.data.questions
                             } else {
-                                console.warn('⚠️ Unexpected response structure:', quizRes.data)
                                 quizData = []
                             }
 
-                            console.log('📝 Quiz questions array:', quizData)
-                            console.log('📊 Number of questions:', quizData.length)
-
                             if (quizData.length === 0) {
-                                console.warn(`⚠️ No quiz questions found for topic ${topic.id}`)
-                                console.warn('This topic will auto-complete when video ends.')
+                                // Fallback or just empty
                             }
 
-                            questions = quizData.map((q: any) => {
-                                console.log('  - Question:', q.question_text, 'Options:', q.options?.length)
+                            questions = quizData.map((q: any, qIdx: number) => {
+                                const options = (q.options || []).map((opt: any, optIdx: number) => ({
+                                    id: opt.id || `opt-${optIdx}`,
+                                    text: opt.option_text || opt.text
+                                }))
+
+                                let correctIdx = (q.options || []).findIndex((opt: any) =>
+                                    opt.is_correct === true || opt.is_correct === "true" || opt.isCorrect === true
+                                )
+
+                                if (correctIdx === -1) correctIdx = 0 // Default to first if none marked
+
                                 return {
-                                    id: q.id,
-                                    question: q.question_text,
-                                    options: (q.options || []).map((opt: any) => ({
-                                        id: opt.id,
-                                        text: opt.option_text
-                                    })),
-                                    correctAnswerIndex: (q.options || []).findIndex((opt: any) => opt.is_correct) ?? 0,
+                                    id: q.id || `q-${qIdx}`,
+                                    question: q.question_text || q.question,
+                                    options,
+                                    correctAnswerIndex: correctIdx,
                                 }
                             })
-                            console.log('✅ Mapped questions:', questions)
                         } catch (e: any) {
-                            console.error('❌ ERROR fetching quiz for topic', topic.id, ':', e)
-                            console.error('Error details:', {
-                                message: e.message,
-                                response: e.response?.data,
-                                status: e.response?.status,
-                                statusText: e.response?.statusText
-                            })
-                            alert(`Quiz fetch failed for topic ${topic.id}: ${e.message}`)
+                            console.error('Quiz load error:', e)
                         }
 
                         // Resolve Video

@@ -136,7 +136,7 @@ export function TopicQuizModal({ isOpen, topicTitle, questions, onClose, onSubmi
                                 disabled={Object.keys(answers).length < questions.length}
                                 className="font-black h-12 px-10 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all ml-auto uppercase tracking-widest text-xs"
                             >
-                                TRANSMIT ANSWERS
+                                SUBMIT
                             </Button>
                         </>
                     ) : (
