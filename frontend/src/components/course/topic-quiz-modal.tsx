@@ -38,12 +38,15 @@ export function TopicQuizModal({ isOpen, topicTitle, questions, onClose, onSubmi
     }
 
     const handleSubmit = () => {
+        if (!questions.length) return
         let correctCount = 0
         questions.forEach((q) => {
             const selectedOptionId = answers[q.id];
-            const correctOption = q.options[q.correctAnswerIndex];
-            if (selectedOptionId === correctOption.id) {
-                correctCount++
+            if (q.correctAnswerIndex >= 0 && q.options[q.correctAnswerIndex]) {
+                const correctOption = q.options[q.correctAnswerIndex];
+                if (selectedOptionId === correctOption.id) {
+                    correctCount++
+                }
             }
         })
         const finalScore = Math.round((correctCount / questions.length) * 100)
@@ -59,12 +62,14 @@ export function TopicQuizModal({ isOpen, topicTitle, questions, onClose, onSubmi
         setScore(0)
     }
 
+    const PASS_THRESHOLD = 85
+
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="sm:max-w-[600px] border-4 border-foreground shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] bg-background p-8">
                 <DialogHeader>
                     <DialogTitle className="text-3xl font-black uppercase tracking-tighter mb-4">
-                        {submitted ? 'Quiz Results' : `Quiz: ${topicTitle}`}
+                        {submitted ? 'Assessment Report' : `Terminal: ${topicTitle}`}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -72,8 +77,8 @@ export function TopicQuizModal({ isOpen, topicTitle, questions, onClose, onSubmi
                     <div className="space-y-8 max-h-[60vh] overflow-y-auto pr-4 custom-scrollbar">
                         {questions.map((q, qIdx) => (
                             <div key={q.id} className="space-y-4">
-                                <h3 className="text-xl font-black leading-tight flex gap-3">
-                                    <span className="bg-foreground text-background w-8 h-8 rounded-lg flex items-center justify-center shrink-0">
+                                <h3 className="text-xl font-black leading-tight flex gap-3 italic">
+                                    <span className="bg-foreground text-background w-8 h-8 rounded-lg flex items-center justify-center shrink-0 not-italic">
                                         {qIdx + 1}
                                     </span>
                                     {q.question}
@@ -84,7 +89,7 @@ export function TopicQuizModal({ isOpen, topicTitle, questions, onClose, onSubmi
                                             key={opt.id}
                                             onClick={() => handleOptionSelect(q.id, opt.id)}
                                             className={cn(
-                                                "text-left p-4 rounded-xl border-4 font-bold transition-all",
+                                                "text-left p-5 rounded-xl border-4 font-black transition-all uppercase tracking-tight text-sm",
                                                 answers[q.id] === opt.id
                                                     ? "bg-primary border-foreground text-primary-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-x-1 translate-y-1"
                                                     : "bg-muted/10 border-transparent hover:border-foreground/20"
@@ -98,46 +103,46 @@ export function TopicQuizModal({ isOpen, topicTitle, questions, onClose, onSubmi
                         ))}
                     </div>
                 ) : (
-                    <div className="py-8 text-center space-y-6">
+                    <div className="py-12 text-center space-y-8">
                         <div className={cn(
-                            "w-24 h-24 mx-auto rounded-3xl flex items-center justify-center border-4 border-foreground shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]",
-                            score >= 70 ? "bg-green-500" : "bg-red-500"
+                            "w-32 h-32 mx-auto rounded-[2rem] flex items-center justify-center border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]",
+                            score >= PASS_THRESHOLD ? "bg-emerald-500 shadow-emerald-500/20" : "bg-destructive shadow-destructive/20"
                         )}>
-                            {score >= 70 ? (
-                                <CheckCircle2 className="w-12 h-12 text-white" />
+                            {score >= PASS_THRESHOLD ? (
+                                <CheckCircle2 className="w-16 h-16 text-white" />
                             ) : (
-                                <AlertCircle className="w-12 h-12 text-white" />
+                                <AlertCircle className="w-16 h-16 text-white" />
                             )}
                         </div>
                         <div>
-                            <p className="text-5xl font-black uppercase italic tracking-tighter">{score}%</p>
-                            <p className="font-bold text-muted-foreground uppercase tracking-widest mt-2">
-                                {score >= 70 ? 'Congratulations! You passed.' : 'Keep studying and try again!'}
+                            <p className="text-7xl font-black uppercase italic tracking-tighter leading-none">{score}%</p>
+                            <p className="font-black text-muted-foreground uppercase tracking-[0.3em] text-[10px] mt-4">
+                                {score >= PASS_THRESHOLD ? 'PROTOCOL PASSED. ACCESS GRANTED.' : `REQUIREMENT: ${PASS_THRESHOLD}% MINIMUM. RETRY.`}
                             </p>
                         </div>
                     </div>
                 )}
 
-                <DialogFooter className="mt-8 flex gap-4">
+                <DialogFooter className="mt-10 flex gap-4">
                     {!submitted ? (
                         <>
-                            <Button variant="ghost" onClick={onClose} className="font-black h-12 px-6">
-                                CANCEL
+                            <Button variant="ghost" onClick={onClose} className="font-black h-12 px-6 uppercase tracking-widest text-xs">
+                                ABORT
                             </Button>
                             <Button
                                 onClick={handleSubmit}
                                 disabled={Object.keys(answers).length < questions.length}
-                                className="font-black h-12 px-8 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all ml-auto"
+                                className="font-black h-12 px-10 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all ml-auto uppercase tracking-widest text-xs"
                             >
-                                SUBMIT QUIZ <Send className="ml-2 w-4 h-4" />
+                                TRANSMIT ANSWERS
                             </Button>
                         </>
                     ) : (
                         <Button
                             onClick={handleFinish}
-                            className="w-full font-black h-14 text-xl border-4 border-foreground shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
+                            className="w-full font-black h-16 text-xl border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all uppercase tracking-tighter italic"
                         >
-                            {score >= 70 ? 'CONTINUE COURSE' : 'RETRY TOPIC'}
+                            {score >= PASS_THRESHOLD ? 'INITIALIZE NEXT MODULE' : 'RELOAD SOURCE VIDEO'}
                         </Button>
                     )}
                 </DialogFooter>

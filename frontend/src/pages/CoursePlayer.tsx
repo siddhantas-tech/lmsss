@@ -169,17 +169,26 @@ export default function CoursePlayerPage() {
             const duration = videoRef.current.duration
             if (duration > 0) {
                 setVideoProgress((current / duration) * 100)
+
+                // Backup trigger if onEnded fails (within 0.3s of end)
+                if (duration - current < 0.3 && !isQuizOpen) {
+                    handleVideoEnded()
+                }
             }
             maxTimeWatched.current = Math.max(maxTimeWatched.current, current)
         }
     }
 
     const handleVideoEnded = () => {
-        const currentTopic = topics.find(t => t.id === currentTopicId)
-        if (currentTopic && currentTopic.questions.length > 0) {
+        if (isQuizOpen) return // Prevent duplicate pops
+
+        const topic = topics.find(t => t.id === currentTopicId)
+        console.log('Video ended for topic:', topic?.title, 'Questions:', topic?.questions?.length)
+
+        if (topic && topic.questions && topic.questions.length > 0) {
             setIsQuizOpen(true)
-        } else {
-            // Auto-complete if no quiz
+        } else if (topic) {
+            console.log('No quiz for this topic, auto-completing')
             completeTopic(currentTopicId!)
         }
     }
