@@ -18,7 +18,11 @@ interface Topic {
   description: string
   course_id: string
   questions: QuizQuestion[]
-  videoUrl?: string // 🔧 added (do not remove)
+  videos?: {
+    id: string
+    title: string
+    video_path: string
+  } | null
 }
 
 interface QuizOption {
@@ -43,6 +47,7 @@ export default function CoursePlayerPage() {
   const [error, setError] = useState<string | null>(null)
   const [isQuizOpen, setIsQuizOpen] = useState(false)
   const [videoError, setVideoError] = useState<string | null>(null)
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const maxTimeWatched = useRef(0)
 
@@ -52,125 +57,174 @@ export default function CoursePlayerPage() {
   }, [currentTopicId])
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchTopicAndQuizzes = async () => {
+      setLoading(true)
       try {
         if (!courseId) return
 
         try {
-          const enrollments = await getMyEnrollments()
-          const enrolled = enrollments.data?.some((e: any) => e.course_id === courseId)
-          if (!enrolled) await enrollCourse(courseId)
-        } catch {}
+          const enrollmentsRes = await getMyEnrollments()
+          const isEnrolled =
+            Array.isArray(enrollmentsRes.data) &&
+            enrollmentsRes.data.some((e: any) => e.course_id === courseId)
+
+          if (!isEnrolled) {
+            await enrollCourse(courseId)
+          }
+        } catch {
+          // intentionally ignored
+        }
 
         const courseRes = await fetchCourseDetails(courseId)
         const topicsRes = await getTopicsByCourse(courseId)
 
-        setCourse({
-          title: courseRes.data?.title ?? 'Untitled Course',
-          description: courseRes.data?.description ?? '',
-        })
+        if (courseRes.data) {
+          setCourse({
+            title: courseRes.data.title || 'Untitled Course',
+            description: courseRes.data.description || '',
+          })
+        }
 
-        const mapped = await Promise.all(
-          (topicsRes.data ?? []).map(async (topic: any, idx: number) => {
+        const topicsRaw = Array.isArray(topicsRes.data) ? topicsRes.data : []
+
+        const mappedTopics: Topic[] = await Promise.all(
+          topicsRaw.map(async (topic: any, idx: number) => {
             let questions: QuizQuestion[] = []
 
             try {
-              const quiz = await getQuizByTopic(topic.id)
-              questions =
-                quiz.data?.questions?.map((q: any) => ({
-                  id: q.id,
-                  question: q.question_text,
-                  options: q.options.map((o: any) => ({
-                    id: o.id,
-                    text: o.option_text,
-                  })),
-                  correctAnswerIndex: q.options.findIndex((o: any) => o.is_correct),
-                })) ?? []
-            } catch {}
+              const quizRes = await getQuizByTopic(topic.id)
+              const quizData = Array.isArray(quizRes.data?.questions)
+                ? quizRes.data.questions
+                : []
 
-            const topicVideo = topic.videos ?? null
+              questions = quizData.map((q: any) => ({
+                id: q.id,
+                question: q.question_text,
+                options: Array.isArray(q.options)
+                  ? q.options.map((opt: any) => ({
+                      id: opt.id,
+                      text: opt.option_text,
+                    }))
+                  : [],
+                correctAnswerIndex: Array.isArray(q.options)
+                  ? q.options.findIndex((opt: any) => opt.is_correct)
+                  : 0,
+              }))
+            } catch {}
 
             return {
               id: topic.id,
               title: topic.title,
-              duration: topicVideo?.duration ?? 0,
+              duration: 0,
               completed: false,
               isLocked: idx !== 0,
-              description: topic.description ?? '',
-              course_id: topic.course_id ?? courseId,
+              description: topic.description || '',
+              course_id: topic.course_id || courseId,
               questions,
-              videoUrl: topicVideo?.video_path ?? undefined, // 🔧 keep but optional
+              videos: topic.videos ?? null,
             }
           })
         )
 
-        setTopics(mapped)
-        setCurrentTopicId(mapped[0]?.id ?? null)
+        setTopics(mappedTopics)
+        setCurrentTopicId(mappedTopics.length > 0 ? mappedTopics[0].id : null)
       } catch (err: any) {
-        setError(err.message || 'Failed to load course')
+        setError(err.message || 'Failed to load topics')
       } finally {
         setLoading(false)
       }
     }
 
-    fetchData()
+    fetchTopicAndQuizzes()
   }, [courseId])
 
   const currentTopic = topics.find(t => t.id === currentTopicId)
-  const hasVideo = !!currentTopic // 🔧 single source of truth
+
+  // ✅ THE ACTUAL FIX
+  const hasVideo =
+    !!currentTopic &&
+    typeof currentTopic.videos?.video_path === 'string'
 
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
 
-    const enforceRate = () => (video.playbackRate = 1)
+    const enforcePlaybackRate = () => {
+      if (video.playbackRate !== 1) video.playbackRate = 1
+    }
+
     const preventSeek = () => {
       if (video.currentTime > maxTimeWatched.current) {
         video.currentTime = maxTimeWatched.current
       }
     }
 
-    video.addEventListener('ratechange', enforceRate)
+    video.addEventListener('ratechange', enforcePlaybackRate)
     video.addEventListener('seeking', preventSeek)
 
     return () => {
-      video.removeEventListener('ratechange', enforceRate)
+      video.removeEventListener('ratechange', enforcePlaybackRate)
       video.removeEventListener('seeking', preventSeek)
     }
   }, [currentTopicId])
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading…</div>
-  if (error) return <div className="min-h-screen flex items-center justify-center text-red-500">{error}</div>
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      maxTimeWatched.current = Math.max(
+        maxTimeWatched.current,
+        videoRef.current.currentTime
+      )
+    }
+  }
+
+  const handleVideoError = () => {
+    setVideoError('Unable to load video for this topic.')
+  }
+
+  const handleVideoEnd = () => {
+    if (currentTopic?.questions.length) {
+      setIsQuizOpen(true)
+    } else {
+      setShowQuizPrompt(true)
+    }
+  }
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-red-500 font-bold">
+        Error: {error}
+      </div>
+    )
+  }
 
   return (
     <div className="bg-background min-h-screen">
-      <div className="aspect-video bg-black flex items-center justify-center">
-        {hasVideo ? (
-          videoError ? (
-            <div className="text-white">{videoError}</div>
-          ) : (
+      <div className="max-w-7xl mx-auto px-6 py-12">
+        <div className="aspect-video bg-black rounded-xl flex items-center justify-center">
+          {currentTopic && hasVideo ? (
             <video
+              key={currentTopic.id}
               ref={videoRef}
-              key={currentTopic!.id}
-              src={`/api/video?topicId=${currentTopic!.id}`}
+              src={`/api/video?topicId=${currentTopic.id}`}
               controls
-              onTimeUpdate={() => {
-                if (videoRef.current)
-                  maxTimeWatched.current = Math.max(
-                    maxTimeWatched.current,
-                    videoRef.current.currentTime
-                  )
-              }}
-              onError={() => setVideoError('Video not available')}
-              className="w-full h-full"
+              onEnded={handleVideoEnd}
+              onTimeUpdate={handleTimeUpdate}
+              onError={handleVideoError}
+              controlsList="nodownload noplaybackrate"
+              disablePictureInPicture
+              playsInline
             />
-          )
-        ) : (
-          <div className="text-white flex flex-col items-center gap-3">
-            <Lock size={48} />
-            Select a topic
-          </div>
-        )}
+          ) : (
+            <div className="text-white/60 text-center">
+              <Lock className="mx-auto h-12 w-12 mb-3" />
+              <p className="font-bold">No video uploaded for this topic</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {currentTopic && (
@@ -179,7 +233,7 @@ export default function CoursePlayerPage() {
           topicTitle={currentTopic.title}
           questions={currentTopic.questions}
           onClose={() => setIsQuizOpen(false)}
-          onSubmit={() => setIsQuizOpen(false)}
+          onSubmit={() => {}}
         />
       )}
     </div>
