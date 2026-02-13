@@ -108,20 +108,13 @@ export default function CoursePlayerPage() {
                         }
 
                         // Exhaustive Video Data Extraction
-                        const topicVideo = (Array.isArray(topic.videos) && topic.videos.length > 0)
-                            ? topic.videos[0]
-                            : (topic.video || null);
+                        const topicVideo = topic.videos ?? null
+                        
 
                         console.log(`Mapping Topic ${topic.id}:`, { topicVideo, raw: topic });
 
                         // Try every possible field name for the video path/URL
-                        const vUrl = topicVideo?.url ||
-                            topicVideo?.video_path ||
-                            topicVideo?.video_url ||
-                            topic.video_url ||
-                            topic.video_path ||
-                            topic.url ||
-                            '';
+                        const vUrl = topicVideo?.video_path ?? ''
 
                         // Try every possible field name for duration
                         const vDuration = topicVideo?.duration ||
