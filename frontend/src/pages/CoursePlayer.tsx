@@ -45,6 +45,10 @@ export default function CoursePlayerPage() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const maxTimeWatched = useRef(0);
 
+    useEffect(() => {
+        console.log("FINAL MAPPED TOPICS STATE:", topics);
+    }, [topics]);
+
     // Reset maxTimeWatched when topic changes
     useEffect(() => {
         maxTimeWatched.current = 0;
@@ -56,7 +60,7 @@ export default function CoursePlayerPage() {
             try {
                 if (!courseId) return;
 
-                // Ensure user is enrolled
+                // Ensure user is enrolled (non-blocking, continue even if it fails)
                 try {
                     const enrollmentsRes = await getMyEnrollments();
                     const isEnrolled = Array.isArray(enrollmentsRes.data) &&
@@ -65,7 +69,8 @@ export default function CoursePlayerPage() {
                         await enrollCourse(courseId);
                     }
                 } catch (e) {
-                    console.error("Enrollment check failed:", e);
+                    console.warn("Enrollment check failed, continuing anyway:", e);
+                    // Non-blocking - continue to load course content
                 }
 
                 const courseRes = await fetchCourseDetails(courseId);
@@ -100,18 +105,36 @@ export default function CoursePlayerPage() {
                             // No quiz for this topic
                         }
 
-                        // Check for nested video data as per backend spec
-                        const topicVideo = (Array.isArray(topic.videos) && topic.videos.length > 0) ? topic.videos[0] : null;
+                        // Exhaustive Video Data Extraction
+                        const topicVideo = (Array.isArray(topic.videos) && topic.videos.length > 0)
+                            ? topic.videos[0]
+                            : (topic.video || null);
+
+                        console.log(`Mapping Topic ${topic.id}:`, { topicVideo, raw: topic });
+
+                        // Try every possible field name for the video path/URL
+                        const vUrl = topicVideo?.url ||
+                            topicVideo?.video_path ||
+                            topicVideo?.video_url ||
+                            topic.video_url ||
+                            topic.video_path ||
+                            topic.url ||
+                            '';
+
+                        // Try every possible field name for duration
+                        const vDuration = topicVideo?.duration ||
+                            topicVideo?.video_duration_seconds ||
+                            topic.duration ||
+                            topic.video_duration_seconds ||
+                            0;
 
                         return {
                             id: topic.id,
                             title: topic.title,
-                            // Support multiple field names from backend (duration, video_duration_seconds)
-                            duration: topicVideo?.duration || topicVideo?.video_duration_seconds || topic.duration || topic.video_duration_seconds || 0,
+                            duration: Number(vDuration),
                             completed: false,
                             isLocked: idx !== 0,
-                            // Support multiple field names for URL/path
-                            videoUrl: topicVideo?.url || topicVideo?.video_path || topic.video_url || topic.video_path || '',
+                            videoUrl: vUrl,
                             description: topic.description || '',
                             course_id: topic.course_id || courseId,
                             questions,
@@ -365,7 +388,7 @@ export default function CoursePlayerPage() {
                                                         {index + 1}. {topic.title}
                                                     </p>
                                                     <p className={`text-sm mt-1 font-bold ${currentTopicId === topic.id ? 'text-white/70' : 'text-muted-foreground'}`}>
-                                                        {topic.duration} min
+                                                        {topic.duration > 0 ? (topic.duration > 60 ? `${Math.ceil(topic.duration / 60)} min` : `${topic.duration} min`) : 'Pending'}
                                                     </p>
                                                 </div>
                                             </div>
