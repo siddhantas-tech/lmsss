@@ -98,13 +98,13 @@ export default function CoursePlayerPage() {
                             }
 
                             questions = quizData.map((q: any, qIdx: number) => {
-                                console.log('🔍 DEBUG QUESTION:', q)
-                                const options = (q.options || []).map((opt: any, optIdx: number) => ({
+                                const optionsList = q.quiz_options || q.options || []
+                                const options = optionsList.map((opt: any, optIdx: number) => ({
                                     id: opt.id || `opt-${optIdx}`,
                                     text: opt.option_text || opt.text
                                 }))
 
-                                let correctIdx = (q.options || []).findIndex((opt: any) =>
+                                let correctIdx = optionsList.findIndex((opt: any) =>
                                     opt.is_correct === true || opt.is_correct === "true" || opt.isCorrect === true
                                 )
 
