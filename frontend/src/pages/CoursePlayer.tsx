@@ -1,17 +1,21 @@
 import { useState, useRef, useEffect } from 'react'
-import { Play, CheckCircle, Clock, Lock, ArrowLeft, MoreVertical, ChevronRight } from 'lucide-react'
+import { Play, CheckCircle, Clock, Lock, ArrowLeft, MoreVertical, ChevronRight, HelpCircle } from 'lucide-react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { getQuizByTopic } from '@/api/quiz'
 import { getCourseDetails as fetchCourseDetails } from '@/api/courses'
-import { TopicQuizModal } from '@/components/course/topic-quiz-modal'
 import { getTopicsByCourse } from '@/api/topics'
 import { cn } from '@/lib/utils'
+
+interface QuizOption {
+    id: string
+    text: string
+}
 
 interface QuizQuestion {
     id: string
     question: string
-    options: { id: string; text: string }[]
+    options: QuizOption[]
     correctAnswerIndex: number
 }
 
@@ -43,6 +47,9 @@ export default function CoursePlayerPage() {
     const [error, setError] = useState<string | null>(null)
     const [isQuizOpen, setIsQuizOpen] = useState(false)
     const [videoError, setVideoError] = useState<string | null>(null)
+    const [videoProgress, setVideoProgress] = useState(0)
+    const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({})
+    const [quizSubmitted, setQuizSubmitted] = useState(false)
 
     const videoRef = useRef<HTMLVideoElement>(null)
     const maxTimeWatched = useRef(0)
@@ -94,7 +101,7 @@ export default function CoursePlayerPage() {
                             id: topic.id,
                             title: topic.title,
                             duration: Number(vDuration),
-                            completed: false, // In a real app, track from user_progress
+                            completed: false,
                             isLocked: idx !== 0,
                             videoUrl: vUrl,
                             description: topic.description || '',
@@ -123,6 +130,10 @@ export default function CoursePlayerPage() {
     useEffect(() => {
         maxTimeWatched.current = 0
         setVideoError(null)
+        setVideoProgress(0)
+        setIsQuizOpen(false)
+        setQuizAnswers({})
+        setQuizSubmitted(false)
         if (videoRef.current) {
             videoRef.current.currentTime = 0
         }
@@ -156,13 +167,18 @@ export default function CoursePlayerPage() {
 
     const handleTimeUpdate = () => {
         if (videoRef.current) {
-            maxTimeWatched.current = Math.max(maxTimeWatched.current, videoRef.current.currentTime)
+            const current = videoRef.current.currentTime
+            const duration = videoRef.current.duration
+            if (duration > 0) {
+                setVideoProgress((current / duration) * 100)
+            }
+            maxTimeWatched.current = Math.max(maxTimeWatched.current, current)
         }
     }
 
     const handleVideoEnded = () => {
-        setIsQuizOpen(true);
-    };
+        setIsQuizOpen(true)
+    }
 
     const completeTopic = (id: string) => {
         setTopics(prev => {
@@ -176,12 +192,16 @@ export default function CoursePlayerPage() {
         })
     }
 
-    const handleQuizSubmit = async (answers: Record<string, string>) => {
+    const handleQuizOptionSelect = (questionId: string, optionId: string) => {
+        setQuizAnswers(prev => ({ ...prev, [questionId]: optionId }))
+    }
+
+    const handleInlineQuizSubmit = () => {
         const topic = topics.find(t => t.id === currentTopicId)
         if (!topic) return
 
         const correctCount = topic.questions.reduce((acc, q) => {
-            const selectedOptIdx = q.options.findIndex(o => o.id === answers[q.id])
+            const selectedOptIdx = q.options.findIndex(o => o.id === quizAnswers[q.id])
             return selectedOptIdx === q.correctAnswerIndex ? acc + 1 : acc
         }, 0)
 
@@ -189,12 +209,15 @@ export default function CoursePlayerPage() {
 
         if (score >= 85) {
             completeTopic(currentTopicId!)
-            setIsQuizOpen(false)
+            setQuizSubmitted(true)
         } else {
+            alert(`You scored ${score.toFixed(0)}%. You need 85% to pass. Please watch the video again.`)
             setIsQuizOpen(false)
+            setQuizAnswers({})
             if (videoRef.current) {
                 videoRef.current.currentTime = 0
                 maxTimeWatched.current = 0
+                setVideoProgress(0)
             }
         }
     }
@@ -238,7 +261,8 @@ export default function CoursePlayerPage() {
                     display: none !important;
                 }
             `}} />
-            {/* Premium Header */}
+
+            {/* Header */}
             <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
                 <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
                     <div className="flex items-center gap-6">
@@ -280,45 +304,134 @@ export default function CoursePlayerPage() {
             <main className="mx-auto max-w-7xl px-6 py-10">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
 
-                    {/* Left Column: Player & Info (2/3) */}
+                    {/* Left Column: Player & Quiz (2/3) */}
                     <div className="lg:col-span-8 space-y-10">
-                        {/* The Video Container */}
-                        <div className="group relative aspect-video overflow-hidden rounded-[2.5rem] bg-black shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] ring-1 ring-white/10">
-                            {currentTopic ? (
-                                <>
-                                    {videoError ? (
-                                        <div className="flex flex-col items-center justify-center h-full p-12 text-center text-white/50 space-y-4">
-                                            <Lock className="h-16 w-16 mb-4 opacity-20" />
-                                            <p className="text-xl font-black uppercase tracking-widest">Media Server Error</p>
-                                            <p className="text-sm font-medium opacity-60 max-w-[280px]">The video stream is currently unreachable. Please refresh or contact support.</p>
-                                            <Button variant="outline" onClick={() => window.location.reload()} className="bg-white/5 border-white/10 hover:bg-white/10 text-white mt-4 font-black">RETRY CONNECTION</Button>
-                                        </div>
-                                    ) : (
-                                        <video
-                                            key={currentTopic.id}
-                                            ref={videoRef}
-                                            src={`/api/video?topicId=${currentTopic.id}`}
-                                            className="h-full w-full object-cover"
-                                            controls
-                                            onEnded={handleVideoEnded}
-                                            onTimeUpdate={handleTimeUpdate}
-                                            onError={() => setVideoError('Playback interrupted')}
-                                            controlsList="nodownload noplaybackrate"
-                                            disablePictureInPicture
-                                            playsInline
-                                            preload="metadata"
-                                        >
-                                            <source src={`/api/video?topicId=${currentTopic.id}`} type="video/mp4" />
-                                            Your browser does not support the video tag.
-                                        </video>
-                                    )}
-                                </>
-                            ) : (
-                                <div className="flex items-center justify-center h-full">
-                                    <p className="text-2xl font-black text-white/20 uppercase tracking-tighter italic">Initializing Media Stream...</p>
+                        <div className="space-y-4">
+                            {/* The Video Container */}
+                            <div className="group relative aspect-video overflow-hidden rounded-[2.5rem] bg-black shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] ring-1 ring-white/10">
+                                {currentTopic ? (
+                                    <>
+                                        {videoError ? (
+                                            <div className="flex flex-col items-center justify-center h-full p-12 text-center text-white/50 space-y-4">
+                                                <Lock className="h-16 w-16 mb-4 opacity-20" />
+                                                <p className="text-xl font-black uppercase tracking-widest">Media Server Error</p>
+                                                <p className="text-sm font-medium opacity-60 max-w-[280px]">The video stream is currently unreachable.</p>
+                                                <Button variant="outline" onClick={() => window.location.reload()} className="bg-white/5 border-white/10 hover:bg-white/10 text-white mt-4 font-black">RETRY</Button>
+                                            </div>
+                                        ) : (
+                                            <video
+                                                key={currentTopic.id}
+                                                ref={videoRef}
+                                                src={`/api/video?topicId=${currentTopic.id}`}
+                                                className="h-full w-full object-cover"
+                                                controls
+                                                onEnded={handleVideoEnded}
+                                                onTimeUpdate={handleTimeUpdate}
+                                                onError={() => setVideoError('Playback interrupted')}
+                                                controlsList="nodownload noplaybackrate"
+                                                disablePictureInPicture
+                                                playsInline
+                                                preload="metadata"
+                                            >
+                                                <source src={`/api/video?topicId=${currentTopic.id}`} type="video/mp4" />
+                                                Your browser does not support the video tag.
+                                            </video>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="flex items-center justify-center h-full text-white/20">
+                                        <p className="text-2xl font-black uppercase italic">Initializing Media Stream...</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Video Progress Bar (Non-draggable) */}
+                            {currentTopic && !videoError && (
+                                <div className="px-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Video Completion</span>
+                                        <span className="text-[10px] font-black tabular-nums text-primary">{Math.round(videoProgress)}%</span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden border border-border/20">
+                                        <div
+                                            className="h-full bg-primary transition-all duration-300 linear shadow-[0_0_10px_rgba(var(--primary),0.5)]"
+                                            style={{ width: `${videoProgress}%` }}
+                                        />
+                                    </div>
                                 </div>
                             )}
                         </div>
+
+                        {/* Inline Quiz Section */}
+                        {isQuizOpen && currentTopic && currentTopic.questions.length > 0 && (
+                            <div className="rounded-[2.5rem] bg-card border-2 border-primary/20 p-10 shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="flex items-center gap-4 mb-8">
+                                    <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                                        <HelpCircle className="h-6 w-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-2xl font-black uppercase tracking-tight leading-none">Knowledge Validation</h3>
+                                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">Pass to unlock next module</p>
+                                    </div>
+                                </div>
+
+                                {quizSubmitted ? (
+                                    <div className="py-10 text-center space-y-6">
+                                        <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500 mx-auto">
+                                            <CheckCircle className="h-10 w-10" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-2xl font-black uppercase tracking-tight">Assessment Passed</h4>
+                                            <p className="text-muted-foreground font-medium mt-2">Next module is now available in your curriculum.</p>
+                                        </div>
+                                        <Button
+                                            onClick={() => setIsQuizOpen(false)}
+                                            className="font-black rounded-xl px-8"
+                                        >
+                                            CONTINUE LEARNING
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-10">
+                                        {currentTopic.questions.map((q, idx) => (
+                                            <div key={q.id} className="space-y-6">
+                                                <div className="flex gap-4">
+                                                    <span className="text-sm font-black text-primary bg-primary/10 h-8 w-8 flex items-center justify-center rounded-lg shrink-0">
+                                                        {idx + 1}
+                                                    </span>
+                                                    <p className="text-xl font-bold leading-tight">{q.question}</p>
+                                                </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-12">
+                                                    {q.options.map((opt) => (
+                                                        <button
+                                                            key={opt.id}
+                                                            onClick={() => handleQuizOptionSelect(q.id, opt.id)}
+                                                            className={cn(
+                                                                "p-5 rounded-2xl border-2 text-left font-bold transition-all duration-200",
+                                                                quizAnswers[q.id] === opt.id
+                                                                    ? "border-primary bg-primary/5 text-primary shadow-inner"
+                                                                    : "border-border/60 hover:border-border hover:bg-muted/30 text-muted-foreground"
+                                                            )}
+                                                        >
+                                                            {opt.text}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <div className="pt-6 border-t border-border/40">
+                                            <Button
+                                                onClick={handleInlineQuizSubmit}
+                                                disabled={Object.keys(quizAnswers).length < currentTopic.questions.length}
+                                                className="w-full h-14 rounded-2xl font-black text-lg uppercase shadow-lg shadow-primary/20"
+                                            >
+                                                SUBMIT ASSESSMENT
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Topic Info */}
                         <div className="space-y-6">
@@ -339,7 +452,7 @@ export default function CoursePlayerPage() {
                             <div className="rounded-4xl bg-card/50 border border-border/40 p-10 hover:border-primary/20 transition-colors duration-300">
                                 <h3 className="text-lg font-black uppercase tracking-widest mb-4">Module Insight</h3>
                                 <p className="text-xl font-medium leading-relaxed text-muted-foreground italic">
-                                    {currentTopic?.description || "In this module, we dive deep into the core mechanics and industry-standard practices relevant to the topic."}
+                                    {currentTopic?.description || "In this module, we dive deep into the core mechanics and industry-standard practices."}
                                 </p>
                             </div>
                         </div>
@@ -421,15 +534,6 @@ export default function CoursePlayerPage() {
                     </div>
                 </div>
             </main>
-
-            {/* Quiz Overlay */}
-            {currentTopic && isQuizOpen && (
-                <TopicQuizModal
-                    topic={currentTopic}
-                    onSubmit={handleQuizSubmit}
-                    onClose={() => setIsQuizOpen(false)}
-                />
-            )}
         </div>
     )
 }
