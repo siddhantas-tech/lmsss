@@ -143,7 +143,6 @@ export default function EditCoursePage() {
       setTopics([...topics, newTopic]);
     } catch (e) {
       console.error("Failed to create topic:", e);
-      alert("Failed to create topic.");
     }
   };
 
@@ -154,7 +153,6 @@ export default function EditCoursePage() {
         setTopics(topics.filter((t) => t.id !== topicId));
       } catch (e: any) {
         console.error("Failed to delete topic:", e);
-        alert(e?.response?.data?.message || "Failed to delete topic from server.");
       }
     }
   };
@@ -189,7 +187,6 @@ export default function EditCoursePage() {
         updateTopicLocal(topicId, { videoId: newVideo.id });
       }
       updateTopicLocal(topicId, { uploading: false, videoUrl: url });
-      alert("Video URL saved!");
     } catch (e: any) {
       updateTopicLocal(topicId, {
         uploading: false,
@@ -216,7 +213,6 @@ export default function EditCoursePage() {
         videoUrl: result.url,
         videoId: result.id
       });
-      alert("Video uploaded successfully!");
     } catch (e: any) {
       console.error("Upload failed:", e);
       updateTopicLocal(topicId, {
@@ -240,7 +236,6 @@ export default function EditCoursePage() {
 
   const handleSave = async () => {
     if (!course.title.trim() || !course.description.trim() || !course.categoryId) {
-      alert('Please fill all course fields');
       return;
     }
     setSubmitting(true);
@@ -254,15 +249,14 @@ export default function EditCoursePage() {
       if (id) {
         await updateCourse(id, payload);
         await assignLabToCourse(id, selectedLabs);
-        alert('Course updated successfully.');
+        // Course updated
       } else {
         await createCourse(payload);
-        alert('Course created successfully.');
+        // Course created
       }
       navigate('/admin/courses');
     } catch (err: any) {
       console.error('Failed to save course:', err);
-      alert(err?.response?.data?.message || err?.message || 'Failed to save course');
     } finally {
       setSubmitting(false);
     }

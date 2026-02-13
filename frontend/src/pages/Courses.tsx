@@ -67,24 +67,15 @@ export default function CoursesPage() {
                   key={course.id}
                   className="group flex flex-col overflow-hidden rounded-[2.5rem] bg-card border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all hover:shadow-[16px_16px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-2"
                 >
-                  <div className="aspect-video relative bg-muted/20 border-b-4 border-foreground">
-                    <img
-                      src={course.thumbnail_url}
-                      alt={course.title}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-
-                    {course.categories?.name && (
-                      <div className="absolute top-4 left-4">
-                        <span className="px-4 py-2 bg-background border-4 border-foreground text-xs font-black uppercase rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                          {course.categories.name}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
                   <div className="flex flex-1 flex-col p-10">
                     <div className="mb-8">
+                      {course.categories?.name && (
+                        <div className="mb-4">
+                          <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest rounded-md border border-primary/20">
+                            {course.categories.name}
+                          </span>
+                        </div>
+                      )}
                       <h3 className="text-3xl font-black mb-4 leading-tight group-hover:text-primary transition-colors">
                         {course.title}
                       </h3>

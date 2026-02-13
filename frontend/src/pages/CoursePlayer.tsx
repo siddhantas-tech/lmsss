@@ -137,9 +137,11 @@ export default function CoursePlayerPage() {
             if (video.playbackRate !== 1) video.playbackRate = 1
         }
 
-        const handleSeeking = () => {
+        const handleSeeking = (e: Event) => {
             if (video.currentTime > maxTimeWatched.current) {
                 video.currentTime = maxTimeWatched.current
+                video.pause()
+                video.play()
             }
         }
 
@@ -159,14 +161,8 @@ export default function CoursePlayerPage() {
     }
 
     const handleVideoEnded = () => {
-        const currentTopic = topics.find(t => t.id === currentTopicId)
-        if (currentTopic?.questions && currentTopic.questions.length > 0) {
-            setIsQuizOpen(true)
-        } else {
-            // If no quiz, auto complete and unlock next
-            completeTopic(currentTopicId!)
-        }
-    }
+        setIsQuizOpen(true);
+    };
 
     const completeTopic = (id: string) => {
         setTopics(prev => {
@@ -194,9 +190,7 @@ export default function CoursePlayerPage() {
         if (score >= 85) {
             completeTopic(currentTopicId!)
             setIsQuizOpen(false)
-            alert(`Passed! Score: ${score.toFixed(0)}%. Next module unlocked.`)
         } else {
-            alert(`Score: ${score.toFixed(0)}%. You need 85% to pass. Try watching the video again.`)
             setIsQuizOpen(false)
             if (videoRef.current) {
                 videoRef.current.currentTime = 0
@@ -235,6 +229,15 @@ export default function CoursePlayerPage() {
 
     return (
         <div className="min-h-screen bg-background text-foreground selection:bg-primary/20">
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                video::-webkit-media-controls-timeline {
+                    display: none !important;
+                }
+                video::-webkit-media-controls-current-time-display {
+                    display: none !important;
+                }
+            `}} />
             {/* Premium Header */}
             <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
                 <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
@@ -333,7 +336,7 @@ export default function CoursePlayerPage() {
                                 )}
                             </div>
 
-                            <div className="rounded-[2rem] bg-card/50 border border-border/40 p-10 hover:border-primary/20 transition-colors duration-300">
+                            <div className="rounded-4xl bg-card/50 border border-border/40 p-10 hover:border-primary/20 transition-colors duration-300">
                                 <h3 className="text-lg font-black uppercase tracking-widest mb-4">Module Insight</h3>
                                 <p className="text-xl font-medium leading-relaxed text-muted-foreground italic">
                                     {currentTopic?.description || "In this module, we dive deep into the core mechanics and industry-standard practices relevant to the topic."}
@@ -344,7 +347,7 @@ export default function CoursePlayerPage() {
 
                     {/* Right Column: Topics List (1/3) */}
                     <div className="lg:col-span-4 lg:pl-4">
-                        <div className="sticky top-[7.5rem] rounded-[2.5rem] bg-card border border-border/60 shadow-2xl shadow-black/5 overflow-hidden">
+                        <div className="sticky top-30 rounded-[2.5rem] bg-card border border-border/60 shadow-2xl shadow-black/5 overflow-hidden">
                             <div className="bg-muted/30 px-8 py-6 border-b border-border/40 flex items-center justify-between">
                                 <h3 className="font-black uppercase tracking-widest text-sm text-foreground/80">Curriculum</h3>
                                 <div className="text-[10px] font-black bg-foreground text-background px-2.5 py-1 rounded-full">{topics.length} MODULES</div>
@@ -363,7 +366,7 @@ export default function CoursePlayerPage() {
                                             onClick={() => setCurrentTopicId(topic.id)}
                                             className={cn(
                                                 "flex w-full items-center gap-5 p-6 text-left transition-all duration-300 border-b border-border/30 last:border-none",
-                                                isActive ? "bg-primary/[0.03]" : "hover:bg-muted/40",
+                                                isActive ? "bg-primary/3" : "hover:bg-muted/40",
                                                 isLocked && "opacity-40 cursor-not-allowed grayscale-[0.8]"
                                             )}
                                         >

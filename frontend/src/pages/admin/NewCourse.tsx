@@ -63,7 +63,6 @@ export default function NewCoursePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim() || !formData.description.trim() || !formData.category) {
-      alert('Please fill all fields');
       return;
     }
     setSubmitting(true);
@@ -76,7 +75,6 @@ export default function NewCoursePage() {
       navigate('/admin/courses');
     } catch (err: any) {
       console.error('Failed to create course:', err);
-      alert(err?.response?.data?.message || err?.message || 'Failed to create course');
     } finally {
       setSubmitting(false);
     }

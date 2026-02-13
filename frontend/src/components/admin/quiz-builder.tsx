@@ -122,7 +122,6 @@ export function QuizBuilder({ topic, open, onOpenChange, onSuccess }: QuizBuilde
             resetDraft()
         } catch (e: any) {
             console.error('Failed to save question:', e)
-            alert('Failed to save/update question. Check console for details.')
         }
     }
 
