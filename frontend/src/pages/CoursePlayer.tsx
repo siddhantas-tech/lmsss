@@ -209,7 +209,7 @@ export default function CoursePlayerPage() {
             <video
               key={currentTopic.id}
               ref={videoRef}
-              src={`/api/video?topicId=${currentTopic.id}`}
+              src={`https://learning-management-system-be.onrender.com/api/video?topicId=${currentTopic.id}`}
               controls
               onEnded={handleVideoEnd}
               onTimeUpdate={handleTimeUpdate}
