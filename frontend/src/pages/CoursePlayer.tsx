@@ -6,7 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getQuizByTopic, submitQuiz } from '@/api/quiz'
 import { getCourseDetails as fetchCourseDetails } from '@/api/courses'
 import { TopicQuizModal } from '@/components/course/topic-quiz-modal'
-import { enrollCourse, getMyEnrollments } from '@/api/enrollments'
 import { getTopicsByCourse } from '@/api/topics'
 
 interface Topic {
@@ -61,19 +60,6 @@ export default function CoursePlayerPage() {
       setLoading(true)
       try {
         if (!courseId) return
-
-        try {
-          const enrollmentsRes = await getMyEnrollments()
-          const isEnrolled =
-            Array.isArray(enrollmentsRes.data) &&
-            enrollmentsRes.data.some((e: any) => e.course_id === courseId)
-
-          if (!isEnrolled) {
-            await enrollCourse(courseId)
-          }
-        } catch {
-          // intentionally ignored
-        }
 
         const courseRes = await fetchCourseDetails(courseId)
         const topicsRes = await getTopicsByCourse(courseId)
@@ -140,7 +126,6 @@ export default function CoursePlayerPage() {
 
   const currentTopic = topics.find(t => t.id === currentTopicId)
 
-  // ✅ THE ACTUAL FIX
   const hasVideo =
     !!currentTopic &&
     typeof currentTopic.videos?.video_path === 'string'
