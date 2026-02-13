@@ -42,6 +42,7 @@ export default function CoursePlayerPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isQuizOpen, setIsQuizOpen] = useState(false);
+    const [videoError, setVideoError] = useState<string | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const maxTimeWatched = useRef(0);
 
@@ -49,9 +50,10 @@ export default function CoursePlayerPage() {
         console.log("FINAL MAPPED TOPICS STATE:", topics);
     }, [topics]);
 
-    // Reset maxTimeWatched when topic changes
+    // Reset maxTimeWatched and video error when topic changes
     useEffect(() => {
         maxTimeWatched.current = 0;
+        setVideoError(null);
     }, [currentTopicId]);
 
     useEffect(() => {
@@ -189,6 +191,17 @@ export default function CoursePlayerPage() {
         }
     };
 
+    const handleVideoError = () => {
+        const video = videoRef.current;
+        console.error('Video playback error:', {
+            error: video?.error,
+            networkState: video?.networkState,
+            readyState: video?.readyState,
+            src: video?.src
+        });
+        setVideoError('Unable to load video. Please ensure the video URL is valid and accessible.');
+    };
+
     const handleVideoEnd = () => {
         if (currentTopic?.questions && currentTopic.questions.length > 0) {
             setIsQuizOpen(true)
@@ -288,22 +301,37 @@ export default function CoursePlayerPage() {
                     <div className="lg:col-span-2 space-y-8">
                         <div className="overflow-hidden bg-black rounded-4xl shadow-2xl aspect-video flex items-center justify-center relative ring-1 ring-white/10">
                             {currentTopic && (currentTopic.videoUrl || currentTopic.id) ? (
-                                <video
-                                    key={currentTopic.id}
-                                    ref={videoRef}
-                                    src={`/api/video?topicId=${currentTopic.id}`}
-                                    controls
-                                    className="w-full h-full object-cover"
-                                    onEnded={handleVideoEnd}
-                                    onTimeUpdate={handleTimeUpdate}
-                                    controlsList="nodownload noplaybackrate"
-                                    disablePictureInPicture
-                                    playsInline
-                                    preload="metadata"
-                                >
-                                    <source src={`/api/video?topicId=${currentTopic.id}`} type="video/mp4" />
-                                    Your browser does not support the video tag.
-                                </video>
+                                videoError ? (
+                                    <div className="flex flex-col items-center justify-center text-white/70 gap-4 p-8">
+                                        <div className="h-20 w-20 rounded-full bg-red-500/10 flex items-center justify-center">
+                                            <svg className="h-10 w-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </div>
+                                        <p className="font-bold text-lg text-center">{videoError}</p>
+                                        <p className="text-sm text-white/50 text-center max-w-md">
+                                            Please contact your instructor or paste a valid video URL in the admin panel.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <video
+                                        key={currentTopic.id}
+                                        ref={videoRef}
+                                        src={`/api/video?topicId=${currentTopic.id}`}
+                                        controls
+                                        className="w-full h-full object-cover"
+                                        onEnded={handleVideoEnd}
+                                        onTimeUpdate={handleTimeUpdate}
+                                        onError={handleVideoError}
+                                        controlsList="nodownload noplaybackrate"
+                                        disablePictureInPicture
+                                        playsInline
+                                        preload="metadata"
+                                    >
+                                        <source src={`/api/video?topicId=${currentTopic.id}`} type="video/mp4" />
+                                        Your browser does not support the video tag.
+                                    </video>
+                                )
                             ) : (
                                 <div className="flex flex-col items-center justify-center text-white/50 gap-4">
                                     <Lock className="h-16 w-16" />
