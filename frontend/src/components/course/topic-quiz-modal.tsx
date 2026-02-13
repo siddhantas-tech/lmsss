@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/Button'
 import { CheckCircle2, AlertCircle } from 'lucide-react'
@@ -28,15 +28,6 @@ export function TopicQuizModal({ isOpen, topicTitle, questions, onClose, onSubmi
     const [answers, setAnswers] = useState<Record<string, string>>({})
     const [submitted, setSubmitted] = useState(false)
     const [score, setScore] = useState(0)
-
-    // Debug: Log when modal state changes
-    React.useEffect(() => {
-        console.log('🎭 TopicQuizModal render - isOpen:', isOpen, 'questions:', questions.length)
-        if (isOpen) {
-            console.log('🎭 MODAL SHOULD BE VISIBLE NOW!')
-            console.log('Questions:', questions)
-        }
-    }, [isOpen, questions])
 
     const handleOptionSelect = (questionId: string, optionId: string) => {
         if (submitted) return
@@ -77,7 +68,6 @@ export function TopicQuizModal({ isOpen, topicTitle, questions, onClose, onSubmi
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent
                 className="sm:max-w-[600px] border-4 border-foreground shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] bg-background p-8"
-                style={{ zIndex: 9999 }}
             >
                 <DialogHeader>
                     <DialogTitle className="text-3xl font-black uppercase tracking-tighter mb-4">
