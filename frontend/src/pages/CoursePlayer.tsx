@@ -10,440 +10,178 @@ import { enrollCourse, getMyEnrollments } from '@/api/enrollments'
 import { getTopicsByCourse } from '@/api/topics'
 
 interface Topic {
-    id: string;
-    title: string;
-    duration: number;
-    completed: boolean;
-    isLocked: boolean;
-    videoUrl: string;
-    description: string;
-    course_id: string;
-    questions: QuizQuestion[];
+  id: string
+  title: string
+  duration: number
+  completed: boolean
+  isLocked: boolean
+  description: string
+  course_id: string
+  questions: QuizQuestion[]
+  videoUrl?: string // 🔧 added (do not remove)
 }
 
 interface QuizOption {
-    id: string;
-    text: string;
+  id: string
+  text: string
 }
 
 interface QuizQuestion {
-    id: string;
-    question: string;
-    options: QuizOption[];
-    correctAnswerIndex: number;
+  id: string
+  question: string
+  options: QuizOption[]
+  correctAnswerIndex: number
 }
 
 export default function CoursePlayerPage() {
-    const { id: courseId } = useParams<{ id: string }>(); // Map 'id' from route to 'courseId' variable
-    const [course, setCourse] = useState<{ title: string; description: string } | null>(null);
-    const [topics, setTopics] = useState<Topic[]>([]);
-    const [currentTopicId, setCurrentTopicId] = useState<string | null>(null);
-    const [showQuizPrompt, setShowQuizPrompt] = useState(false);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [isQuizOpen, setIsQuizOpen] = useState(false);
-    const [videoError, setVideoError] = useState<string | null>(null);
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const maxTimeWatched = useRef(0);
+  const { id: courseId } = useParams<{ id: string }>()
+  const [course, setCourse] = useState<{ title: string; description: string } | null>(null)
+  const [topics, setTopics] = useState<Topic[]>([])
+  const [currentTopicId, setCurrentTopicId] = useState<string | null>(null)
+  const [showQuizPrompt, setShowQuizPrompt] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isQuizOpen, setIsQuizOpen] = useState(false)
+  const [videoError, setVideoError] = useState<string | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const maxTimeWatched = useRef(0)
 
-    useEffect(() => {
-        console.log("FINAL MAPPED TOPICS STATE:", topics);
-    }, [topics]);
+  useEffect(() => {
+    maxTimeWatched.current = 0
+    setVideoError(null)
+  }, [currentTopicId])
 
-    // Reset maxTimeWatched and video error when topic changes
-    useEffect(() => {
-        maxTimeWatched.current = 0;
-        setVideoError(null);
-    }, [currentTopicId]);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        if (!courseId) return
 
-    useEffect(() => {
-        const fetchTopicAndQuizzes = async () => {
-            setLoading(true);
-            try {
-                if (!courseId) return;
-
-                // Ensure user is enrolled (non-blocking, continue even if it fails)
-                try {
-                    const enrollmentsRes = await getMyEnrollments();
-                    const isEnrolled = Array.isArray(enrollmentsRes.data) &&
-                        enrollmentsRes.data.some((e: any) => e.course_id === courseId);
-                    if (!isEnrolled) {
-                        await enrollCourse(courseId);
-                    }
-                } catch (e) {
-                    console.warn("Enrollment check failed, continuing anyway:", e);
-                    // Non-blocking - continue to load course content
-                }
-
-                const courseRes = await fetchCourseDetails(courseId);
-                const topicsRes = await getTopicsByCourse(courseId);
-
-                if (courseRes.data) {
-                    setCourse({
-                        title: courseRes.data.title || "Untitled Course",
-                        description: courseRes.data.description || ""
-                    });
-                }
-
-                console.log("Fetched course topics:", topicsRes.data); // DEBUG
-                const topicsRaw = Array.isArray(topicsRes.data) ? topicsRes.data : [];
-                // topicsRaw should be an array of topics
-                const mappedTopics: Topic[] = await Promise.all(
-                    topicsRaw.map(async (topic: any, idx: number) => {
-                        let questions: QuizQuestion[] = [];
-                        try {
-                            const quizRes = await getQuizByTopic(topic.id);
-                            const quizData = Array.isArray(quizRes.data?.questions) ? quizRes.data.questions : [];
-                            questions = quizData.map((q: any) => ({
-                                id: q.id,
-                                question: q.question_text,
-                                options: Array.isArray(q.options) ? q.options.map((opt: any) => ({
-                                    id: opt.id,
-                                    text: opt.option_text
-                                })) : [],
-                                correctAnswerIndex: Array.isArray(q.options) ? q.options.findIndex((opt: any) => opt.is_correct) : 0,
-                            }));
-                        } catch (e) {
-                            // No quiz for this topic
-                        }
-
-                        // Exhaustive Video Data Extraction
-                        const topicVideo = topic.videos ?? null
-                        
-
-                        console.log(`Mapping Topic ${topic.id}:`, { topicVideo, raw: topic });
-
-                        // Try every possible field name for the video path/URL
-                        const vUrl = topicVideo?.video_path ?? ''
-
-                        // Try every possible field name for duration
-                        const vDuration = topicVideo?.duration ||
-                            topicVideo?.video_duration_seconds ||
-                            topic.duration ||
-                            topic.video_duration_seconds ||
-                            0;
-
-                        return {
-                            id: topic.id,
-                            title: topic.title,
-                            duration: Number(vDuration),
-                            completed: false,
-                            isLocked: idx !== 0,
-                            videoUrl: vUrl,
-                            description: topic.description || '',
-                            course_id: topic.course_id || courseId,
-                            questions,
-                        };
-                    })
-                );
-                setTopics(mappedTopics);
-                setCurrentTopicId(mappedTopics.length > 0 ? mappedTopics[0].id : null);
-            } catch (error: any) {
-                console.error("Error fetching topics:", error);
-                setError(error.message || "Failed to load topics");
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchTopicAndQuizzes();
-    }, [courseId]);
-
-    const currentTopic = topics.find((t) => t.id === currentTopicId)
-
-    // Enforce playback rules
-    useEffect(() => {
-        const video = videoRef.current
-        if (!video) return
-
-        const enforcePlaybackRate = () => {
-            if (video.playbackRate !== 1.0) {
-                video.playbackRate = 1.0
-            }
-        }
-
-        const preventSeek = () => {
-            if (video.currentTime > maxTimeWatched.current) {
-                video.currentTime = maxTimeWatched.current;
-            }
-        }
-
-        video.addEventListener('ratechange', enforcePlaybackRate)
-        video.addEventListener('seeking', preventSeek)
-        video.playbackRate = 1.0
-
-        return () => {
-            video.removeEventListener('ratechange', enforcePlaybackRate)
-            video.removeEventListener('seeking', preventSeek)
-        }
-    }, [currentTopicId])
-
-    const handleTimeUpdate = () => {
-        const video = videoRef.current;
-        if (video && video.currentTime > maxTimeWatched.current) {
-            maxTimeWatched.current = video.currentTime;
-        }
-    };
-
-    const handleVideoError = () => {
-        const video = videoRef.current;
-        console.error('Video playback error:', {
-            error: video?.error,
-            networkState: video?.networkState,
-            readyState: video?.readyState,
-            src: video?.src
-        });
-        setVideoError('Unable to load video. Please ensure the video URL is valid and accessible.');
-    };
-
-    const handleVideoEnd = () => {
-        if (currentTopic?.questions && currentTopic.questions.length > 0) {
-            setIsQuizOpen(true)
-        } else {
-            setShowQuizPrompt(true)
-        }
-    }
-
-    const handleTopicClick = (topicId: string) => {
-        const topic = topics.find((t) => t.id === topicId)
-        if (!topic?.isLocked) {
-            setCurrentTopicId(topicId)
-            setShowQuizPrompt(false)
-        }
-    }
-
-    const handleQuizSubmit = async (score: number, answers: Record<string, string>) => {
         try {
-            if (!courseId || !currentTopicId) return;
+          const enrollments = await getMyEnrollments()
+          const enrolled = enrollments.data?.some((e: any) => e.course_id === courseId)
+          if (!enrolled) await enrollCourse(courseId)
+        } catch {}
 
-            // Optional: Send to backend
-            const payload = {
-                topicId: currentTopicId,
-                courseId: courseId,
-                isFinalExam: false,
-                timeTaken: 0, // Could be tracked if needed
-                answers: Object.entries(answers).map(([questionId, selectedOptionId]) => ({
-                    questionId,
-                    selectedOptionId
-                }))
-            };
+        const courseRes = await fetchCourseDetails(courseId)
+        const topicsRes = await getTopicsByCourse(courseId)
 
-            const res = await submitQuiz(payload);
-            const finalScore = res.data.score || score;
+        setCourse({
+          title: courseRes.data?.title ?? 'Untitled Course',
+          description: courseRes.data?.description ?? '',
+        })
 
-            if (finalScore >= 85) {
-                const currentIndex = topics.findIndex(t => t.id === currentTopicId)
-                const newTopics = [...topics]
+        const mapped = await Promise.all(
+          (topicsRes.data ?? []).map(async (topic: any, idx: number) => {
+            let questions: QuizQuestion[] = []
 
-                newTopics[currentIndex] = { ...newTopics[currentIndex], completed: true }
+            try {
+              const quiz = await getQuizByTopic(topic.id)
+              questions =
+                quiz.data?.questions?.map((q: any) => ({
+                  id: q.id,
+                  question: q.question_text,
+                  options: q.options.map((o: any) => ({
+                    id: o.id,
+                    text: o.option_text,
+                  })),
+                  correctAnswerIndex: q.options.findIndex((o: any) => o.is_correct),
+                })) ?? []
+            } catch {}
 
-                let nextTopicId = null
-                if (currentIndex + 1 < newTopics.length) {
-                    newTopics[currentIndex + 1] = { ...newTopics[currentIndex + 1], isLocked: false }
-                    nextTopicId = newTopics[currentIndex + 1].id
-                }
+            const topicVideo = topic.videos ?? null
 
-                setTopics(newTopics)
-                setIsQuizOpen(false)
-
-                if (nextTopicId) {
-                    setCurrentTopicId(nextTopicId)
-                }
-            } else {
-                setIsQuizOpen(false)
+            return {
+              id: topic.id,
+              title: topic.title,
+              duration: topicVideo?.duration ?? 0,
+              completed: false,
+              isLocked: idx !== 0,
+              description: topic.description ?? '',
+              course_id: topic.course_id ?? courseId,
+              questions,
+              videoUrl: topicVideo?.video_path ?? undefined, // 🔧 keep but optional
             }
-        } catch (error) {
-            console.error("Failed to submit quiz:", error);
-            alert("Failed to submit quiz. Please try again.");
-            setIsQuizOpen(false);
-        }
+          })
+        )
+
+        setTopics(mapped)
+        setCurrentTopicId(mapped[0]?.id ?? null)
+      } catch (err: any) {
+        setError(err.message || 'Failed to load course')
+      } finally {
+        setLoading(false)
+      }
     }
 
-    if (loading) {
-        return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    fetchData()
+  }, [courseId])
+
+  const currentTopic = topics.find(t => t.id === currentTopicId)
+  const hasVideo = !!currentTopic // 🔧 single source of truth
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    const enforceRate = () => (video.playbackRate = 1)
+    const preventSeek = () => {
+      if (video.currentTime > maxTimeWatched.current) {
+        video.currentTime = maxTimeWatched.current
+      }
     }
 
-    if (error) {
-        return <div className="flex items-center justify-center min-h-screen text-red-500 font-bold">Error: {error}</div>;
+    video.addEventListener('ratechange', enforceRate)
+    video.addEventListener('seeking', preventSeek)
+
+    return () => {
+      video.removeEventListener('ratechange', enforceRate)
+      video.removeEventListener('seeking', preventSeek)
     }
+  }, [currentTopicId])
 
-    return (
-        <div className="bg-background min-h-screen">
-            <div className="bg-card shadow-sm border-b border-border/5">
-                <div className="max-w-7xl mx-auto px-6 py-10">
-                    <div className="bg-primary/5 p-4 mb-6 rounded-2xl border border-primary/10 text-[10px] font-black uppercase tracking-widest text-primary/50 flex items-center gap-3">
-                        <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                        Session Active • {topics.length} Modules Loaded
-                    </div>
-                    <div className="flex items-center gap-4 mb-4">
-                        <Link to="/courses" className="text-muted-foreground hover:text-foreground flex items-center gap-2 font-bold transition-colors">
-                            <ArrowLeft className="h-4 w-4" /> Back to Courses
-                        </Link>
-                    </div>
-                    <h1 className="text-4xl sm:text-5xl font-black text-foreground tracking-tight uppercase">
-                        {course?.title || "Course Player"}
-                    </h1>
-                    <p className="text-muted-foreground font-bold mt-4 flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                        Progress: {topics.filter(t => t.completed).length} of {topics.length} topics completed
-                    </p>
-                </div>
-            </div>
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading…</div>
+  if (error) return <div className="min-h-screen flex items-center justify-center text-red-500">{error}</div>
 
-            <div className="max-w-7xl mx-auto px-6 py-12">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-                    <div className="lg:col-span-2 space-y-8">
-                        <div className="overflow-hidden bg-black rounded-4xl shadow-2xl aspect-video flex items-center justify-center relative ring-1 ring-white/10">
-                            {currentTopic && (currentTopic.videoUrl || currentTopic.id) ? (
-                                videoError ? (
-                                    <div className="flex flex-col items-center justify-center text-white/70 gap-4 p-8">
-                                        <div className="h-20 w-20 rounded-full bg-red-500/10 flex items-center justify-center">
-                                            <svg className="h-10 w-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                        </div>
-                                        <p className="font-bold text-lg text-center">{videoError}</p>
-                                        <p className="text-sm text-white/50 text-center max-w-md">
-                                            Please contact your instructor or paste a valid video URL in the admin panel.
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <video
-                                        key={currentTopic.id}
-                                        ref={videoRef}
-                                        src={`/api/video?topicId=${currentTopic.id}`}
-                                        controls
-                                        className="w-full h-full object-cover"
-                                        onEnded={handleVideoEnd}
-                                        onTimeUpdate={handleTimeUpdate}
-                                        onError={handleVideoError}
-                                        controlsList="nodownload noplaybackrate"
-                                        disablePictureInPicture
-                                        playsInline
-                                        preload="metadata"
-                                    >
-                                        <source src={`/api/video?topicId=${currentTopic.id}`} type="video/mp4" />
-                                        Your browser does not support the video tag.
-                                    </video>
-                                )
-                            ) : (
-                                <div className="flex flex-col items-center justify-center text-white/50 gap-4">
-                                    <Lock className="h-16 w-16" />
-                                    <p className="font-bold text-lg">Select a topic to start</p>
-                                </div>
-                            )}
-                        </div>
+  return (
+    <div className="bg-background min-h-screen">
+      <div className="aspect-video bg-black flex items-center justify-center">
+        {hasVideo ? (
+          videoError ? (
+            <div className="text-white">{videoError}</div>
+          ) : (
+            <video
+              ref={videoRef}
+              key={currentTopic!.id}
+              src={`/api/video?topicId=${currentTopic!.id}`}
+              controls
+              onTimeUpdate={() => {
+                if (videoRef.current)
+                  maxTimeWatched.current = Math.max(
+                    maxTimeWatched.current,
+                    videoRef.current.currentTime
+                  )
+              }}
+              onError={() => setVideoError('Video not available')}
+              className="w-full h-full"
+            />
+          )
+        ) : (
+          <div className="text-white flex flex-col items-center gap-3">
+            <Lock size={48} />
+            Select a topic
+          </div>
+        )}
+      </div>
 
-                        {currentTopic && (
-                            <div className="space-y-6">
-                                <div>
-                                    <h2 className="text-3xl font-black text-foreground">{currentTopic.title}</h2>
-                                    <div className="flex items-center gap-4 mt-3">
-                                        <div className="flex items-center gap-2 text-primary font-bold bg-primary/10 px-3 py-1 rounded-full text-sm">
-                                            <Clock className="h-4 w-4" />
-                                            <span>{currentTopic.duration} minutes</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {showQuizPrompt && (
-                                    <div className="bg-primary/5 rounded-3xl p-8 border-2 border-primary/20 shadow-lg">
-                                        <h3 className="font-black text-2xl mb-2">Topic Complete!</h3>
-                                        <p className="font-bold text-muted-foreground mb-6">Take the quiz to unlock the next chapter.</p>
-                                        <div className="flex gap-4">
-                                            <Button onClick={() => setIsQuizOpen(true)} className="h-14 px-8 rounded-2xl font-black text-lg shadow-lg">
-                                                Take Topic Quiz
-                                            </Button>
-                                            <Button variant="outline" onClick={() => setShowQuizPrompt(false)} className="h-14 px-8 rounded-2xl font-black border-2 border-border/10">
-                                                Review Video
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="rounded-[2.5rem] p-10 bg-card border border-border/5 shadow-xl">
-                                    <h3 className="text-xl font-black mb-4">About this topic</h3>
-                                    <p className="text-muted-foreground leading-relaxed font-semibold text-lg">
-                                        {currentTopic.description}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="lg:col-span-1">
-                        <div className="rounded-[2.5rem] bg-card shadow-2xl overflow-hidden border border-border/5 sticky top-24">
-                            <Tabs defaultValue="content" className="w-full">
-                                <TabsList className="w-full h-16 bg-muted/20 p-2 gap-2 border-b border-border/5">
-                                    <TabsTrigger value="content" className="flex-1 rounded-2xl font-bold h-full data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all">
-                                        Content
-                                    </TabsTrigger>
-                                    <TabsTrigger value="notes" className="flex-1 rounded-2xl font-bold h-full data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all">
-                                        Notes
-                                    </TabsTrigger>
-                                </TabsList>
-
-                                <TabsContent value="content" className="p-4 space-y-3">
-                                    {topics.map((topic, index) => (
-                                        <button
-                                            key={topic.id}
-                                            onClick={() => handleTopicClick(topic.id)}
-                                            disabled={topic.isLocked}
-                                            className={`w-full text-left p-6 transition-all rounded-3xl group relative overflow-hidden ${currentTopicId === topic.id
-                                                ? 'bg-primary text-primary-foreground shadow-xl'
-                                                : 'bg-muted/10 hover:bg-muted/20 text-muted-foreground'
-                                                } ${topic.isLocked ? 'opacity-40 grayscale' : 'cursor-pointer'}`}
-                                        >
-                                            <div className="flex items-start gap-4 z-10 relative">
-                                                <div className={`h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 border-2 ${currentTopicId === topic.id ? 'bg-white/10 border-white/20' : 'bg-background border-border/10'
-                                                    }`}>
-                                                    {topic.completed ? (
-                                                        <CheckCircle className="h-6 w-6" />
-                                                    ) : topic.isLocked ? (
-                                                        <Lock className="h-6 w-6" />
-                                                    ) : (
-                                                        <Play className={`h-6 w-6 ${currentTopicId === topic.id ? 'fill-current' : ''}`} />
-                                                    )}
-                                                </div>
-                                                <div className="flex-1 min-w-0 pt-1">
-                                                    <p className="font-black text-base truncate">
-                                                        {index + 1}. {topic.title}
-                                                    </p>
-                                                    <p className={`text-sm mt-1 font-bold ${currentTopicId === topic.id ? 'text-white/70' : 'text-muted-foreground'}`}>
-                                                        {topic.duration > 0 ? (topic.duration > 60 ? `${Math.ceil(topic.duration / 60)} min` : `${topic.duration} min`) : 'Pending'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            {currentTopicId === topic.id && (
-                                                <div className="absolute top-0 right-0 h-full w-24 bg-white/5 skew-x-30 translate-x-12" />
-                                            )}
-                                        </button>
-                                    ))}
-                                </TabsContent>
-
-                                <TabsContent value="notes" className="p-8 text-center">
-                                    <div className="py-20 flex flex-col items-center gap-4">
-                                        <div className="h-16 w-16 rounded-full bg-muted/20 flex items-center justify-center">
-                                            <Clock className="h-8 w-8 text-muted-foreground" />
-                                        </div>
-                                        <p className="font-bold text-muted-foreground">Notes feature coming soon!</p>
-                                        <Button variant="outline" className="rounded-xl border-2">Add Note</Button>
-                                    </div>
-                                </TabsContent>
-                            </Tabs>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {currentTopic && (
-                <TopicQuizModal
-                    isOpen={isQuizOpen}
-                    topicTitle={currentTopic.title}
-                    questions={currentTopic.questions || []}
-                    onClose={() => setIsQuizOpen(false)}
-                    onSubmit={handleQuizSubmit}
-                />
-            )}
-        </div>
-    )
+      {currentTopic && (
+        <TopicQuizModal
+          isOpen={isQuizOpen}
+          topicTitle={currentTopic.title}
+          questions={currentTopic.questions}
+          onClose={() => setIsQuizOpen(false)}
+          onSubmit={() => setIsQuizOpen(false)}
+        />
+      )}
+    </div>
+  )
 }
