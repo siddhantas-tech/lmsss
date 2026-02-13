@@ -110,6 +110,11 @@ export default function CoursePlayerPage() {
                     })
                 )
 
+                console.log('=== LOADED TOPICS ==>', mappedTopics)
+                mappedTopics.forEach((t, i) => {
+                    console.log(`Topic ${i + 1}: "${t.title}" - Questions: ${t.questions?.length || 0}`)
+                })
+
                 setTopics(mappedTopics)
                 if (mappedTopics.length > 0) {
                     setCurrentTopicId(mappedTopics[0].id)
@@ -180,16 +185,29 @@ export default function CoursePlayerPage() {
     }
 
     const handleVideoEnded = () => {
-        if (isQuizOpen) return // Prevent duplicate pops
+        console.log('🎬 VIDEO ENDED EVENT FIRED!')
+        console.log('Current isQuizOpen state:', isQuizOpen)
+
+        if (isQuizOpen) {
+            console.log('Quiz already open, skipping')
+            return
+        }
 
         const topic = topics.find(t => t.id === currentTopicId)
-        console.log('Video ended for topic:', topic?.title, 'Questions:', topic?.questions?.length)
+        console.log('📋 Topic found:', topic?.title)
+        console.log('❓ Questions array:', topic?.questions)
+        console.log('📊 Question count:', topic?.questions?.length)
 
         if (topic && topic.questions && topic.questions.length > 0) {
+            console.log('✅ OPENING QUIZ MODAL NOW!')
+            alert(`Quiz is ready! Topic: ${topic.title}, Questions: ${topic.questions.length}`)
             setIsQuizOpen(true)
         } else if (topic) {
-            console.log('No quiz for this topic, auto-completing')
+            console.log('⚠️ No quiz for this topic, auto-completing')
+            alert('No quiz for this topic - auto completing')
             completeTopic(currentTopicId!)
+        } else {
+            console.log('❌ No topic found!')
         }
     }
 
@@ -314,7 +332,7 @@ export default function CoursePlayerPage() {
                             </div>
 
                             {/* No-Drag Progress Bar */}
-                            <div className="px-2">
+                            <div className="px-2 space-y-4">
                                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">
                                     <span>Stream Progress</span>
                                     <span className="tabular-nums text-primary">{Math.round(videoProgress)}%</span>
@@ -325,6 +343,19 @@ export default function CoursePlayerPage() {
                                         style={{ width: `${videoProgress}%` }}
                                     />
                                 </div>
+
+                                {/* DEBUG: Test Quiz Button */}
+                                <Button
+                                    onClick={() => {
+                                        console.log('🧪 TEST BUTTON CLICKED')
+                                        console.log('Current topic:', currentTopic)
+                                        console.log('Questions:', currentTopic?.questions)
+                                        setIsQuizOpen(true)
+                                    }}
+                                    className="w-full font-black border-2 border-destructive bg-destructive/10 text-destructive"
+                                >
+                                    🧪 TEST QUIZ (DEBUG ONLY)
+                                </Button>
                             </div>
                         </div>
 

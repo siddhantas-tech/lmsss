@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/Button'
-import { CheckCircle2, AlertCircle, Send } from 'lucide-react'
+import { CheckCircle2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface QuizOption {
@@ -105,7 +105,7 @@ export function TopicQuizModal({ isOpen, topicTitle, questions, onClose, onSubmi
                 ) : (
                     <div className="py-12 text-center space-y-8">
                         <div className={cn(
-                            "w-32 h-32 mx-auto rounded-[2rem] flex items-center justify-center border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]",
+                            "w-32 h-32 mx-auto rounded-4xl flex items-center justify-center border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]",
                             score >= PASS_THRESHOLD ? "bg-emerald-500 shadow-emerald-500/20" : "bg-destructive shadow-destructive/20"
                         )}>
                             {score >= PASS_THRESHOLD ? (
