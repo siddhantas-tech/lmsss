@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { Play, CheckCircle, Clock, Lock, ArrowLeft, MoreVertical, ChevronRight, HelpCircle } from 'lucide-react'
+import { Play, CheckCircle, Clock, Lock, ArrowLeft, ChevronRight } from 'lucide-react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { getQuizByTopic } from '@/api/quiz'
 import { getCourseDetails as fetchCourseDetails } from '@/api/courses'
 import { getTopicsByCourse } from '@/api/topics'
+import { TopicQuizModal } from '@/components/course/topic-quiz-modal'
 import { cn } from '@/lib/utils'
 
 interface QuizOption {
@@ -48,8 +49,6 @@ export default function CoursePlayerPage() {
     const [isQuizOpen, setIsQuizOpen] = useState(false)
     const [videoError, setVideoError] = useState<string | null>(null)
     const [videoProgress, setVideoProgress] = useState(0)
-    const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({})
-    const [quizSubmitted, setQuizSubmitted] = useState(false)
 
     const videoRef = useRef<HTMLVideoElement>(null)
     const maxTimeWatched = useRef(0)
@@ -117,7 +116,7 @@ export default function CoursePlayerPage() {
                 }
             } catch (err: any) {
                 console.error('Failed to load course player:', err)
-                setError('Failed to load the course content. Please try again later.')
+                setError('Failed to load the course content.')
             } finally {
                 setLoading(false)
             }
@@ -132,14 +131,13 @@ export default function CoursePlayerPage() {
         setVideoError(null)
         setVideoProgress(0)
         setIsQuizOpen(false)
-        setQuizAnswers({})
-        setQuizSubmitted(false)
         if (videoRef.current) {
             videoRef.current.currentTime = 0
+            videoRef.current.load() // Ensure video source refreshes correctly
         }
     }, [currentTopicId])
 
-    // Restricted Playback & Speed Control
+    // Restricted Playback
     useEffect(() => {
         const video = videoRef.current
         if (!video) return
@@ -148,7 +146,7 @@ export default function CoursePlayerPage() {
             if (video.playbackRate !== 1) video.playbackRate = 1
         }
 
-        const handleSeeking = (e: Event) => {
+        const handleSeeking = () => {
             if (video.currentTime > maxTimeWatched.current) {
                 video.currentTime = maxTimeWatched.current
                 video.pause()
@@ -177,12 +175,19 @@ export default function CoursePlayerPage() {
     }
 
     const handleVideoEnded = () => {
-        setIsQuizOpen(true)
+        const currentTopic = topics.find(t => t.id === currentTopicId)
+        if (currentTopic && currentTopic.questions.length > 0) {
+            setIsQuizOpen(true)
+        } else {
+            // Auto-complete if no quiz
+            completeTopic(currentTopicId!)
+        }
     }
 
     const completeTopic = (id: string) => {
         setTopics(prev => {
             const index = prev.findIndex(t => t.id === id)
+            if (index === -1) return prev
             const newTopics = [...prev]
             newTopics[index] = { ...newTopics[index], completed: true }
             if (index + 1 < newTopics.length) {
@@ -192,28 +197,13 @@ export default function CoursePlayerPage() {
         })
     }
 
-    const handleQuizOptionSelect = (questionId: string, optionId: string) => {
-        setQuizAnswers(prev => ({ ...prev, [questionId]: optionId }))
-    }
-
-    const handleInlineQuizSubmit = () => {
-        const topic = topics.find(t => t.id === currentTopicId)
-        if (!topic) return
-
-        const correctCount = topic.questions.reduce((acc, q) => {
-            const selectedOptIdx = q.options.findIndex(o => o.id === quizAnswers[q.id])
-            return selectedOptIdx === q.correctAnswerIndex ? acc + 1 : acc
-        }, 0)
-
-        const score = (correctCount / topic.questions.length) * 100
-
+    const handleQuizSubmit = (score: number) => {
         if (score >= 85) {
             completeTopic(currentTopicId!)
-            setQuizSubmitted(true)
-        } else {
-            alert(`You scored ${score.toFixed(0)}%. You need 85% to pass. Please watch the video again.`)
             setIsQuizOpen(false)
-            setQuizAnswers({})
+        } else {
+            // Reset video for retry
+            setIsQuizOpen(false)
             if (videoRef.current) {
                 videoRef.current.currentTime = 0
                 maxTimeWatched.current = 0
@@ -229,7 +219,7 @@ export default function CoursePlayerPage() {
             <div className="flex h-screen items-center justify-center bg-background">
                 <div className="flex flex-col items-center gap-4">
                     <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                    <p className="font-bold text-muted-foreground animate-pulse leading-none">Initializing Player...</p>
+                    <p className="font-bold text-muted-foreground animate-pulse leading-none uppercase tracking-widest text-xs">Initializing Media...</p>
                 </div>
             </div>
         )
@@ -239,11 +229,10 @@ export default function CoursePlayerPage() {
         return (
             <div className="flex h-screen items-center justify-center bg-background px-6">
                 <div className="max-w-md text-center">
-                    <div className="mb-6 inline-flex h-20 w-20 items-center justify-center rounded-full bg-destructive/10 text-destructive text-4xl font-black">!</div>
-                    <h2 className="text-3xl font-black mb-2 text-foreground uppercase tracking-tight">Access Error</h2>
-                    <p className="text-muted-foreground mb-8 font-medium">There was a problem loading your session. Please check your connection.</p>
+                    <h2 className="text-3xl font-black mb-2 uppercase italic tracking-tighter text-destructive">System Offline</h2>
+                    <p className="text-muted-foreground mb-8 font-medium">Unable to establish connection to the course server.</p>
                     <Button onClick={() => navigate('/courses')} size="lg" className="w-full font-black rounded-xl">
-                        <ArrowLeft className="mr-2 h-5 w-5" /> RE-ENTER CLASSROOM
+                        RE-ENTER CLASSROOM
                     </Button>
                 </div>
             </div>
@@ -251,52 +240,38 @@ export default function CoursePlayerPage() {
     }
 
     return (
-        <div className="min-h-screen bg-background text-foreground selection:bg-primary/20">
+        <div className="min-h-screen bg-background text-foreground">
             <style dangerouslySetInnerHTML={{
                 __html: `
-                video::-webkit-media-controls-timeline {
-                    display: none !important;
-                }
-                video::-webkit-media-controls-current-time-display {
-                    display: none !important;
-                }
+                video::-webkit-media-controls-timeline { display: none !important; }
+                video::-webkit-media-controls-current-time-display { display: none !important; }
             `}} />
 
-            {/* Header */}
             <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
                 <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
                     <div className="flex items-center gap-6">
-                        <Link
-                            to="/courses"
-                            className="group flex items-center justify-center h-10 w-10 rounded-full border border-border/60 bg-background hover:bg-muted transition-all duration-300 active:scale-95"
-                        >
-                            <ArrowLeft className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                        <Link to="/courses" className="h-10 w-10 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all">
+                            <ArrowLeft className="h-5 w-5" />
                         </Link>
                         <div>
-                            <h1 className="text-xl font-black tracking-tight leading-none uppercase truncate max-w-[300px] md:max-w-lg">
+                            <h1 className="text-xl font-black uppercase tracking-tighter truncate max-w-[300px] md:max-w-lg">
                                 {course?.title}
                             </h1>
-                            <div className="mt-1.5 flex items-center gap-3">
-                                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest">
-                                    <Play className="h-2.5 w-2.5 fill-current" /> Auto-Progress
-                                </div>
-                                <span className="text-xs font-bold text-muted-foreground tabular-nums tracking-wide">
-                                    {topics.filter(t => t.completed).length}/{topics.length} COMPLETE
+                            <div className="mt-1 flex items-center gap-3">
+                                <span className="text-[10px] font-black italic text-muted-foreground">
+                                    {topics.filter(t => t.completed).length}/{topics.length} MODULES COMPLETE
                                 </span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="hidden md:flex items-center gap-3">
-                        <div className="h-2 w-32 rounded-full bg-muted overflow-hidden">
+                    <div className="hidden md:block">
+                        <div className="h-2 w-32 bg-muted border border-foreground/10 rounded-full overflow-hidden">
                             <div
-                                className="h-full bg-primary transition-all duration-700 ease-out"
+                                className="h-full bg-primary transition-all duration-700"
                                 style={{ width: `${(topics.filter(t => t.completed).length / (topics.length || 1)) * 100}%` }}
                             />
                         </div>
-                        <span className="text-xs font-black text-muted-foreground tabular-nums bg-muted/30 px-2 py-1 rounded-md border border-border/50">
-                            {Math.round((topics.filter(t => t.completed).length / (topics.length || 1)) * 100)}%
-                        </span>
                     </div>
                 </div>
             </header>
@@ -304,169 +279,64 @@ export default function CoursePlayerPage() {
             <main className="mx-auto max-w-7xl px-6 py-10">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
 
-                    {/* Left Column: Player & Quiz (2/3) */}
                     <div className="lg:col-span-8 space-y-10">
-                        <div className="space-y-4">
-                            {/* The Video Container */}
-                            <div className="group relative aspect-video overflow-hidden rounded-[2.5rem] bg-black shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] ring-1 ring-white/10">
+                        {/* Video Layer */}
+                        <div className="space-y-6">
+                            <div className="relative aspect-video bg-black overflow-hidden rounded-3xl border-4 border-foreground shadow-[16px_16px_0px_0px_rgba(0,0,0,0.1)]">
                                 {currentTopic ? (
-                                    <>
-                                        {videoError ? (
-                                            <div className="flex flex-col items-center justify-center h-full p-12 text-center text-white/50 space-y-4">
-                                                <Lock className="h-16 w-16 mb-4 opacity-20" />
-                                                <p className="text-xl font-black uppercase tracking-widest">Media Server Error</p>
-                                                <p className="text-sm font-medium opacity-60 max-w-[280px]">The video stream is currently unreachable.</p>
-                                                <Button variant="outline" onClick={() => window.location.reload()} className="bg-white/5 border-white/10 hover:bg-white/10 text-white mt-4 font-black">RETRY</Button>
-                                            </div>
-                                        ) : (
-                                            <video
-                                                key={currentTopic.id}
-                                                ref={videoRef}
-                                                src={`/api/video?topicId=${currentTopic.id}`}
-                                                className="h-full w-full object-cover"
-                                                controls
-                                                onEnded={handleVideoEnded}
-                                                onTimeUpdate={handleTimeUpdate}
-                                                onError={() => setVideoError('Playback interrupted')}
-                                                controlsList="nodownload noplaybackrate"
-                                                disablePictureInPicture
-                                                playsInline
-                                                preload="metadata"
-                                            >
-                                                <source src={`/api/video?topicId=${currentTopic.id}`} type="video/mp4" />
-                                                Your browser does not support the video tag.
-                                            </video>
-                                        )}
-                                    </>
+                                    <video
+                                        key={currentTopic.id}
+                                        ref={videoRef}
+                                        src={`/api/video?topicId=${currentTopic.id}`}
+                                        className="h-full w-full object-cover"
+                                        controls
+                                        onEnded={handleVideoEnded}
+                                        onTimeUpdate={handleTimeUpdate}
+                                        onError={() => setVideoError('Playback Error')}
+                                        controlsList="nodownload noplaybackrate"
+                                        disablePictureInPicture
+                                        playsInline
+                                    >
+                                        <source src={`/api/video?topicId=${currentTopic.id}`} type="video/mp4" />
+                                    </video>
                                 ) : (
-                                    <div className="flex items-center justify-center h-full text-white/20">
-                                        <p className="text-2xl font-black uppercase italic">Initializing Media Stream...</p>
-                                    </div>
+                                    <div className="flex items-center justify-center h-full text-white/10 uppercase font-black italic text-3xl">Ready for Launch</div>
                                 )}
                             </div>
 
-                            {/* Video Progress Bar (Non-draggable) */}
-                            {currentTopic && !videoError && (
-                                <div className="px-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Video Completion</span>
-                                        <span className="text-[10px] font-black tabular-nums text-primary">{Math.round(videoProgress)}%</span>
-                                    </div>
-                                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden border border-border/20">
-                                        <div
-                                            className="h-full bg-primary transition-all duration-300 linear shadow-[0_0_10px_rgba(var(--primary),0.5)]"
-                                            style={{ width: `${videoProgress}%` }}
-                                        />
-                                    </div>
+                            {/* No-Drag Progress Bar */}
+                            <div className="px-2">
+                                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">
+                                    <span>Stream Progress</span>
+                                    <span className="tabular-nums text-primary">{Math.round(videoProgress)}%</span>
                                 </div>
-                            )}
+                                <div className="h-4 bg-muted border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,0.05)] overflow-hidden">
+                                    <div
+                                        className="h-full bg-primary transition-all duration-300"
+                                        style={{ width: `${videoProgress}%` }}
+                                    />
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Inline Quiz Section */}
-                        {isQuizOpen && currentTopic && currentTopic.questions.length > 0 && (
-                            <div className="rounded-[2.5rem] bg-card border-2 border-primary/20 p-10 shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <div className="flex items-center gap-4 mb-8">
-                                    <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-                                        <HelpCircle className="h-6 w-6" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-2xl font-black uppercase tracking-tight leading-none">Knowledge Validation</h3>
-                                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">Pass to unlock next module</p>
-                                    </div>
-                                </div>
-
-                                {quizSubmitted ? (
-                                    <div className="py-10 text-center space-y-6">
-                                        <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500 mx-auto">
-                                            <CheckCircle className="h-10 w-10" />
-                                        </div>
-                                        <div>
-                                            <h4 className="text-2xl font-black uppercase tracking-tight">Assessment Passed</h4>
-                                            <p className="text-muted-foreground font-medium mt-2">Next module is now available in your curriculum.</p>
-                                        </div>
-                                        <Button
-                                            onClick={() => setIsQuizOpen(false)}
-                                            className="font-black rounded-xl px-8"
-                                        >
-                                            CONTINUE LEARNING
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-10">
-                                        {currentTopic.questions.map((q, idx) => (
-                                            <div key={q.id} className="space-y-6">
-                                                <div className="flex gap-4">
-                                                    <span className="text-sm font-black text-primary bg-primary/10 h-8 w-8 flex items-center justify-center rounded-lg shrink-0">
-                                                        {idx + 1}
-                                                    </span>
-                                                    <p className="text-xl font-bold leading-tight">{q.question}</p>
-                                                </div>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-12">
-                                                    {q.options.map((opt) => (
-                                                        <button
-                                                            key={opt.id}
-                                                            onClick={() => handleQuizOptionSelect(q.id, opt.id)}
-                                                            className={cn(
-                                                                "p-5 rounded-2xl border-2 text-left font-bold transition-all duration-200",
-                                                                quizAnswers[q.id] === opt.id
-                                                                    ? "border-primary bg-primary/5 text-primary shadow-inner"
-                                                                    : "border-border/60 hover:border-border hover:bg-muted/30 text-muted-foreground"
-                                                            )}
-                                                        >
-                                                            {opt.text}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ))}
-                                        <div className="pt-6 border-t border-border/40">
-                                            <Button
-                                                onClick={handleInlineQuizSubmit}
-                                                disabled={Object.keys(quizAnswers).length < currentTopic.questions.length}
-                                                className="w-full h-14 rounded-2xl font-black text-lg uppercase shadow-lg shadow-primary/20"
-                                            >
-                                                SUBMIT ASSESSMENT
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Topic Info */}
-                        <div className="space-y-6">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-2 block">Currently Playing</span>
-                                    <h2 className="text-4xl font-black tracking-tight leading-tight uppercase">
-                                        {currentTopic?.title}
-                                    </h2>
-                                </div>
-                                {currentTopic?.completed && (
-                                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] text-white">
-                                        <CheckCircle className="h-6 w-6" />
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="rounded-4xl bg-card/50 border border-border/40 p-10 hover:border-primary/20 transition-colors duration-300">
-                                <h3 className="text-lg font-black uppercase tracking-widest mb-4">Module Insight</h3>
-                                <p className="text-xl font-medium leading-relaxed text-muted-foreground italic">
-                                    {currentTopic?.description || "In this module, we dive deep into the core mechanics and industry-standard practices."}
-                                </p>
-                            </div>
+                        {/* Current Info */}
+                        <div className="space-y-6 p-10 bg-card border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-primary">Now Inspecting</span>
+                            <h2 className="text-4xl font-black uppercase tracking-tighter leading-none italic">{currentTopic?.title}</h2>
+                            <p className="text-xl font-bold leading-relaxed text-muted-foreground italic">
+                                “{currentTopic?.description || "In-depth industrial analysis and technical mastery of the manufacturing core."}”
+                            </p>
                         </div>
                     </div>
 
-                    {/* Right Column: Topics List (1/3) */}
-                    <div className="lg:col-span-4 lg:pl-4">
-                        <div className="sticky top-30 rounded-[2.5rem] bg-card border border-border/60 shadow-2xl shadow-black/5 overflow-hidden">
-                            <div className="bg-muted/30 px-8 py-6 border-b border-border/40 flex items-center justify-between">
-                                <h3 className="font-black uppercase tracking-widest text-sm text-foreground/80">Curriculum</h3>
-                                <div className="text-[10px] font-black bg-foreground text-background px-2.5 py-1 rounded-full">{topics.length} MODULES</div>
+                    {/* Sidebar */}
+                    <div className="lg:col-span-4">
+                        <div className="sticky top-30 space-y-4">
+                            <div className="bg-foreground text-background p-6 border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                                <h3 className="font-black uppercase tracking-tighter text-xl italic">Curriculum Plan</h3>
                             </div>
 
-                            <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">
+                            <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-1">
                                 {topics.map((topic, index) => {
                                     const isActive = topic.id === currentTopicId
                                     const isLocked = topic.isLocked
@@ -478,54 +348,19 @@ export default function CoursePlayerPage() {
                                             disabled={isLocked}
                                             onClick={() => setCurrentTopicId(topic.id)}
                                             className={cn(
-                                                "flex w-full items-center gap-5 p-6 text-left transition-all duration-300 border-b border-border/30 last:border-none",
-                                                isActive ? "bg-primary/3" : "hover:bg-muted/40",
-                                                isLocked && "opacity-40 cursor-not-allowed grayscale-[0.8]"
+                                                "w-full p-6 text-left border-4 transition-all duration-300",
+                                                isActive ? "bg-primary/10 border-primary translate-x-1" : "bg-card border-foreground/10 hover:border-foreground grayscale-[0.5] hover:grayscale-0",
+                                                isLocked && "opacity-20 cursor-not-allowed pointer-events-none"
                                             )}
                                         >
-                                            <div className={cn(
-                                                "relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 transition-all duration-500",
-                                                isActive ? "bg-primary border-primary shadow-[0_8px_20px_rgba(var(--primary),0.3)]" : "bg-background border-border/80 shadow-sm",
-                                                isCompleted && !isActive && "bg-emerald-50 border-emerald-200 text-emerald-600"
-                                            )}>
-                                                {isCompleted ? (
-                                                    <CheckCircle className={cn("h-6 w-6", isActive ? "text-white" : "text-emerald-500")} />
-                                                ) : isLocked ? (
-                                                    <Lock className="h-5 w-5 text-muted-foreground/50" />
-                                                ) : (
-                                                    <Play className={cn("h-5 w-5", isActive ? "text-white fill-current" : "text-primary")} />
-                                                )}
-                                                {isActive && (
-                                                    <span className="absolute -right-1 -top-1 flex h-4 w-4">
-                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/40 opacity-75"></span>
-                                                        <span className="relative inline-flex rounded-full h-4 w-4 bg-white/20"></span>
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            <div className="flex-1 space-y-1.5 min-w-0">
-                                                <p className={cn(
-                                                    "truncate text-sm font-black uppercase tracking-tight",
-                                                    isActive ? "text-primary" : "text-foreground/90"
-                                                )}>
-                                                    {index + 1}. {topic.title}
-                                                </p>
-                                                <div className="flex items-center gap-3">
-                                                    <div className="flex items-center gap-1.5 text-muted-foreground/60">
-                                                        <Clock className="h-3.5 w-3.5" />
-                                                        <span className="text-[11px] font-bold tabular-nums">
-                                                            {topic.duration > 0 ? (topic.duration > 120 ? `${Math.ceil(topic.duration / 60)} Mins` : `${topic.duration} Secs`) : "TBD"}
-                                                        </span>
-                                                    </div>
-                                                    {isActive && (
-                                                        <div className="text-[9px] font-black uppercase bg-primary text-white px-2 py-0.5 rounded shadow-sm">NOW PLAYING</div>
-                                                    )}
+                                            <div className="flex items-center gap-4">
+                                                <span className="text-2xl font-black tabular-nums opacity-20 italic">0{index + 1}</span>
+                                                <div className="flex-1">
+                                                    <p className="font-black uppercase tracking-tighter text-sm leading-none">{topic.title}</p>
+                                                    <p className="text-[10px] font-bold text-muted-foreground mt-2 uppercase tracking-widest">{topic.duration > 60 ? `${Math.ceil(topic.duration / 60)} Mins` : `${topic.duration} Secs`}</p>
                                                 </div>
+                                                {isCompleted ? <CheckCircle className="text-green-500 w-5 h-5" /> : isLocked ? <Lock className="w-4 h-4 text-muted-foreground" /> : null}
                                             </div>
-                                            <ChevronRight className={cn(
-                                                "h-5 w-5 shrink-0 transition-transform duration-300",
-                                                isActive ? "translate-x-1 text-primary" : "text-border/80 opacity-0 group-hover:opacity-100"
-                                            )} />
                                         </button>
                                     )
                                 })}
@@ -534,6 +369,17 @@ export default function CoursePlayerPage() {
                     </div>
                 </div>
             </main>
+
+            {/* THE POP-UP BOX (Modal) */}
+            {currentTopic && (
+                <TopicQuizModal
+                    isOpen={isQuizOpen}
+                    topicTitle={currentTopic.title}
+                    questions={currentTopic.questions}
+                    onClose={() => setIsQuizOpen(false)}
+                    onSubmit={handleQuizSubmit}
+                />
+            )}
         </div>
     )
 }
