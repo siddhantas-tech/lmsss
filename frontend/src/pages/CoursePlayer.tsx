@@ -106,12 +106,12 @@ export default function CoursePlayerPage() {
                         return {
                             id: topic.id,
                             title: topic.title,
-                            // Use duration from the video record if available
-                            duration: topicVideo?.duration || topic.duration || 0,
+                            // Support multiple field names from backend (duration, video_duration_seconds)
+                            duration: topicVideo?.duration || topicVideo?.video_duration_seconds || topic.duration || topic.video_duration_seconds || 0,
                             completed: false,
                             isLocked: idx !== 0,
-                            // Video presence is indicated by the existance of a video record
-                            videoUrl: topicVideo?.url || topic.video_url || '',
+                            // Support multiple field names for URL/path
+                            videoUrl: topicVideo?.url || topicVideo?.video_path || topic.video_url || topic.video_path || '',
                             description: topic.description || '',
                             course_id: topic.course_id || courseId,
                             questions,
@@ -268,6 +268,7 @@ export default function CoursePlayerPage() {
                                 <video
                                     key={currentTopic.id}
                                     ref={videoRef}
+                                    src={`/api/video?topicId=${currentTopic.id}`}
                                     controls
                                     className="w-full h-full object-cover"
                                     onEnded={handleVideoEnd}
