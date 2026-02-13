@@ -98,6 +98,7 @@ export default function CoursePlayerPage() {
                             }
 
                             questions = quizData.map((q: any, qIdx: number) => {
+                                console.log('🔍 DEBUG QUESTION:', q)
                                 const options = (q.options || []).map((opt: any, optIdx: number) => ({
                                     id: opt.id || `opt-${optIdx}`,
                                     text: opt.option_text || opt.text
