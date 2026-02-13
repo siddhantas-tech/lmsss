@@ -10,6 +10,7 @@ import {
   Check,
   ChevronsUpDown,
   Loader2,
+  Upload,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
@@ -40,7 +41,7 @@ import { getCategories } from "@/api/categories";
 import { getLabs, getLabsForCourse, assignLabToCourse } from "@/api/labs";
 import { getCourseDetails, updateCourse, createCourse } from "@/api/courses";
 import { createTopic, updateTopic, deleteTopic, getTopicsByCourse } from "@/api/topics";
-import { createVideo, updateVideo } from "@/api/videos";
+import { createVideo, updateVideo, uploadVideo } from "@/api/videos";
 import { QuizBuilder } from "@/components/admin/quiz-builder";
 import api from "@/api/axios";
 // import { updateCourse } from "@/api/courses.api"; // wire later
@@ -108,12 +109,15 @@ export default function EditCoursePage() {
       }
 
       if (Array.isArray(topicsRes.data)) {
-        setTopics(topicsRes.data.map((t: any) => ({
-          ...t,
-          videoUrl: t.video_url || "",
-          videoId: t.video_id,
-          showVideoSection: false
-        })));
+        setTopics(topicsRes.data.map((t: any) => {
+          const topicVideo = (Array.isArray(t.videos) && t.videos.length > 0) ? t.videos[0] : null;
+          return {
+            ...t,
+            videoUrl: topicVideo?.url || t.video_url || "",
+            videoId: topicVideo?.id || t.video_id,
+            showVideoSection: false
+          };
+        }));
       }
     } catch (error) {
       console.error("Failed to load course data:", error);
@@ -174,7 +178,7 @@ export default function EditCoursePage() {
     try {
       const topic = topics.find(t => t.id === topicId);
       if (topic?.videoId) {
-        await updateVideo(topic.videoId, { title: topic.title + " Video", url });
+        await updateVideo(topic.id, { title: topic.title + " Video", url });
       } else {
         const { data: newVideo } = await createVideo({
           title: topic?.title + " Video",
@@ -190,6 +194,34 @@ export default function EditCoursePage() {
       updateTopicLocal(topicId, {
         uploading: false,
         uploadError: e?.response?.data?.message || e?.message || "Failed to save video URL.",
+      });
+    }
+  };
+
+  const handleVideoFileUpload = async (topicId: string, file: File) => {
+    if (!file) return;
+    updateTopicLocal(topicId, { uploading: true, uploadError: "" });
+    try {
+      const topic = topics.find(t => t.id === topicId);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("topicId", topicId);
+      formData.append("courseId", id!);
+      formData.append("title", topic?.title || "Topic Video");
+
+      const { data: result } = await uploadVideo(formData);
+
+      updateTopicLocal(topicId, {
+        uploading: false,
+        videoUrl: result.url,
+        videoId: result.id
+      });
+      alert("Video uploaded successfully!");
+    } catch (e: any) {
+      console.error("Upload failed:", e);
+      updateTopicLocal(topicId, {
+        uploading: false,
+        uploadError: e?.response?.data?.message || e?.message || "Failed to upload video.",
       });
     }
   };
@@ -365,27 +397,57 @@ export default function EditCoursePage() {
 
                     {topic.showVideoSection ? (
                       <div className="mt-4 rounded-lg border bg-muted/30 p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                        <div className="space-y-2">
-                          <Label className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">Video Content URL</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              placeholder="https://example.com/video.mp4"
-                              value={topic.videoUrl || ""}
-                              onChange={(e) => updateTopicLocal(topic.id, { videoUrl: e.target.value })}
-                              className="bg-background border-2 focus-visible:border-primary transition-colors"
-                            />
-                            <Button
-                              size="sm"
-                              disabled={topic.uploading}
-                              onClick={() => saveTopicVideoUrl(topic.id, topic.videoUrl)}
-                              className="font-bold px-4"
-                            >
-                              {topic.uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : "APPLY"}
-                            </Button>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                            <Label className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">Video Content URL</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="https://example.com/video.mp4"
+                                value={topic.videoUrl || ""}
+                                onChange={(e) => updateTopicLocal(topic.id, { videoUrl: e.target.value })}
+                                className="bg-background border-2 focus-visible:border-primary transition-colors"
+                              />
+                              <Button
+                                size="sm"
+                                disabled={topic.uploading}
+                                onClick={() => saveTopicVideoUrl(topic.id, topic.videoUrl)}
+                                className="font-bold px-4"
+                              >
+                                {topic.uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : "APPLY"}
+                              </Button>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground font-medium italic">
+                              Link via URL (MP4, YouTube, HLS)
+                            </p>
                           </div>
-                          <p className="text-[10px] text-muted-foreground font-medium italic">
-                            Supports MP4, YouTube, and HLS streaming links.
-                          </p>
+
+                          <div className="space-y-2">
+                            <Label className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">Upload Video File</Label>
+                            <div className="relative group/file">
+                              <Input
+                                type="file"
+                                accept="video/*"
+                                className="hidden"
+                                id={`file-upload-${topic.id}`}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleVideoFileUpload(topic.id, file);
+                                }}
+                              />
+                              <Button
+                                variant="outline"
+                                className="w-full border-2 border-dashed border-primary/20 hover:border-primary/50 hover:bg-primary/5 h-10 flex gap-2 font-bold transition-all"
+                                onClick={() => document.getElementById(`file-upload-${topic.id}`)?.click()}
+                                disabled={topic.uploading}
+                              >
+                                <Upload className="h-4 w-4" />
+                                {topic.uploading ? "UPLOADING..." : "CHOOSE FILE"}
+                              </Button>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground font-medium italic">
+                              Direct upload to Supabase Storage
+                            </p>
+                          </div>
                         </div>
 
                         {topic.uploadError ? (

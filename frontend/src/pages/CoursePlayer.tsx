@@ -99,13 +99,19 @@ export default function CoursePlayerPage() {
                         } catch (e) {
                             // No quiz for this topic
                         }
+
+                        // Check for nested video data as per backend spec
+                        const topicVideo = (Array.isArray(topic.videos) && topic.videos.length > 0) ? topic.videos[0] : null;
+
                         return {
                             id: topic.id,
                             title: topic.title,
-                            duration: topic.video_duration_seconds || topic.duration || 0,
+                            // Use duration from the video record if available
+                            duration: topicVideo?.duration || topic.duration || 0,
                             completed: false,
                             isLocked: idx !== 0,
-                            videoUrl: topic.video_url || '',
+                            // Video presence is indicated by the existance of a video record
+                            videoUrl: topicVideo?.url || topic.video_url || '',
                             description: topic.description || '',
                             course_id: topic.course_id || courseId,
                             questions,
@@ -258,11 +264,10 @@ export default function CoursePlayerPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
                     <div className="lg:col-span-2 space-y-8">
                         <div className="overflow-hidden bg-black rounded-4xl shadow-2xl aspect-video flex items-center justify-center relative ring-1 ring-white/10">
-                            {currentTopic ? (
+                            {currentTopic && (currentTopic.videoUrl || currentTopic.id) ? (
                                 <video
                                     key={currentTopic.id}
                                     ref={videoRef}
-                                    src={`/api/video?topicId=${currentTopic.id}`}
                                     controls
                                     className="w-full h-full object-cover"
                                     onEnded={handleVideoEnd}
