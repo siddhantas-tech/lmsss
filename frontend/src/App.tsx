@@ -2,7 +2,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import CoursesPage from './pages/Courses';
 import CoursePlayer from './pages/CoursePlayer';
 import CourseExamPage from './pages/CourseExam';
-import CourseAssignmentPage from './pages/CourseAssignment';
 import DashboardPage from './pages/Dashboard';
 import CategoriesPage from './pages/Categories';
 import CategoryDetailPage from './pages/CategoryDetail';
@@ -22,15 +21,6 @@ import { ThemeProvider } from './components/ui/themeProvider';
 import MainLayout from './components/layout/MainLayout';
 import './styles/index.css';
 
-const PagePlaceholder = ({ title }: { title: string }) => (
-  <div className="min-h-screen bg-background flex flex-col items-center justify-center p-12 text-center">
-    <div className="h-20 w-20 rounded-3xl bg-primary/5 border-4 border-foreground/10 flex items-center justify-center mb-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.05)]">
-      <div className="h-10 w-10 rounded-xl bg-primary animate-pulse" />
-    </div>
-    <h1 className="text-5xl font-black uppercase tracking-tighter mb-4">{title}</h1>
-    <p className="text-xl font-bold text-muted-foreground uppercase tracking-widest italic tracking-tight">Accessing Secure Module... Connection Pending.</p>
-  </div>
-);
 
 function AppContent() {
   const { user } = useAuth();
@@ -76,8 +66,6 @@ function AppContent() {
             {/* Focus Mode Routes */}
             <Route path="/courses/:id" element={<CoursePlayer />} />
             <Route path="/courses/:id/exam" element={<CourseExamPage />} />
-            <Route path="/courses/:id/assignment" element={<CourseAssignmentPage />} />
-            <Route path="/exams/:id" element={<PagePlaceholder title="Exam Simulation" />} />
 
             {/* 404 Redirect: If no route matches, send them to /courses */}
             <Route path="*" element={<Navigate to="/courses" replace />} />

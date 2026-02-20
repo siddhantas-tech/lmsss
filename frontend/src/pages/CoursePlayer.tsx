@@ -1,24 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { Play, CheckCircle, Clock, Lock, ArrowLeft, ChevronRight } from 'lucide-react'
+import { Play, CheckCircle, Clock, Lock, ArrowLeft, ChevronRight, Upload, FileText } from 'lucide-react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
-import { getQuizByTopic } from '@/api/quiz'
 import { getCourseDetails as fetchCourseDetails } from '@/api/courses'
 import { getTopicsByCourse } from '@/api/topics'
 
 import { cn } from '@/lib/utils'
-
-interface QuizOption {
-    id: string
-    text: string
-}
-
-interface QuizQuestion {
-    id: string
-    question: string
-    options: QuizOption[]
-    correctAnswerIndex: number
-}
 
 interface Topic {
     id: string
@@ -28,8 +15,9 @@ interface Topic {
     isLocked: boolean
     description: string
     course_id: string
-    questions: QuizQuestion[]
     videoUrl?: string
+    assignmentUploaded?: boolean
+    assignmentUrl?: string
 }
 
 interface Course {
@@ -46,8 +34,6 @@ export default function CoursePlayerPage() {
     const [currentTopicId, setCurrentTopicId] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-
-    const [videoError, setVideoError] = useState<string | null>(null)
     const [videoProgress, setVideoProgress] = useState(0)
 
     const videoRef = useRef<HTMLVideoElement>(null)
@@ -73,72 +59,23 @@ export default function CoursePlayerPage() {
                 }
 
                 const rawTopics = Array.isArray(topicsRes.data) ? topicsRes.data : []
-                const mappedTopics: Topic[] = await Promise.all(
-                    rawTopics.map(async (topic: any, idx: number) => {
-                        // Fetch Quiz
-                        let questions: QuizQuestion[] = []
-                        try {
-                            const quizRes = await getQuizByTopic(topic.id)
+                const mappedTopics: Topic[] = rawTopics.map((topic: any, idx: number) => {
+                    const topicVideo = (topic.videos && topic.videos.length > 0) ? topic.videos[0] : (topic.video || null)
+                    const vUrl = topicVideo?.url || topicVideo?.video_path || topic.video_url || ''
+                    const vDuration = topicVideo?.duration || topic.duration || topic.video_duration_seconds || 0
 
-                            // Try multiple possible response structures
-                            let quizData = []
-
-                            if (Array.isArray(quizRes.data)) {
-                                quizData = quizRes.data
-                            } else if (quizRes.data?.questions) {
-                                quizData = quizRes.data.questions
-                            } else if (quizRes.data?.data?.questions) {
-                                quizData = quizRes.data.data.questions
-                            } else {
-                                quizData = []
-                            }
-
-                            if (quizData.length === 0) {
-                                // Fallback or just empty
-                            }
-
-                            questions = quizData.map((q: any, qIdx: number) => {
-                                const optionsList = q.quiz_options || q.options || []
-                                const options = optionsList.map((opt: any, optIdx: number) => ({
-                                    id: opt.id || `opt-${optIdx}`,
-                                    text: opt.option_text || opt.text
-                                }))
-
-                                let correctIdx = optionsList.findIndex((opt: any) =>
-                                    opt.is_correct === true || opt.is_correct === "true" || opt.isCorrect === true
-                                )
-
-                                if (correctIdx === -1) correctIdx = 0 // Default to first if none marked
-
-                                return {
-                                    id: q.id || `q-${qIdx}`,
-                                    question: q.question_text || q.question,
-                                    options,
-                                    correctAnswerIndex: correctIdx,
-                                }
-                            })
-                        } catch (e: any) {
-                            console.error('Quiz load error:', e)
-                        }
-
-                        // Resolve Video
-                        const topicVideo = (topic.videos && topic.videos.length > 0) ? topic.videos[0] : (topic.video || null)
-                        const vUrl = topicVideo?.url || topicVideo?.video_path || topic.video_url || ''
-                        const vDuration = topicVideo?.duration || topic.duration || topic.video_duration_seconds || 0
-
-                        return {
-                            id: topic.id,
-                            title: topic.title,
-                            duration: Number(vDuration),
-                            completed: false,
-                            isLocked: idx !== 0,
-                            videoUrl: vUrl,
-                            description: topic.description || '',
-                            course_id: topic.course_id || courseId,
-                            questions,
-                        }
-                    })
-                )
+                    return {
+                        id: topic.id,
+                        title: topic.title,
+                        duration: Number(vDuration),
+                        completed: false,
+                        isLocked: idx !== 0,
+                        videoUrl: vUrl,
+                        description: topic.description || '',
+                        course_id: topic.course_id || courseId,
+                        assignmentUrl: topic.assignment_url || topic.assignment_path || ''
+                    }
+                })
 
                 setTopics(mappedTopics)
                 if (mappedTopics.length > 0) {
@@ -157,12 +94,11 @@ export default function CoursePlayerPage() {
     // Reset progress and handle logic when current topic changes
     useEffect(() => {
         maxTimeWatched.current = 0
-        setVideoError(null)
         setVideoProgress(0)
 
         if (videoRef.current) {
             videoRef.current.currentTime = 0
-            videoRef.current.load() // Ensure video source refreshes correctly
+            videoRef.current.load()
         }
     }, [currentTopicId])
 
@@ -227,8 +163,6 @@ export default function CoursePlayerPage() {
             return newTopics
         })
     }
-
-
 
     const currentTopic = topics.find(t => t.id === currentTopicId)
 
@@ -310,7 +244,6 @@ export default function CoursePlayerPage() {
                                         controls
                                         onEnded={handleVideoEnded}
                                         onTimeUpdate={handleTimeUpdate}
-                                        onError={() => setVideoError('Playback Error')}
                                         controlsList="nodownload noplaybackrate"
                                         disablePictureInPicture
                                         playsInline
@@ -339,63 +272,114 @@ export default function CoursePlayerPage() {
 
                         {/* Current Info */}
                         <div className="space-y-6 p-10 bg-card border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-primary">Now Inspecting</span>
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-primary">Now Inspecting</span>
+                                {currentTopic?.assignmentUploaded && (
+                                    <div className="flex items-center gap-2 text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 uppercase tracking-widest">
+                                        <CheckCircle className="h-3 w-3" /> Assignment Submitted
+                                    </div>
+                                )}
+                            </div>
                             <h2 className="text-4xl font-black uppercase tracking-tighter leading-none italic">{currentTopic?.title}</h2>
                             <p className="text-xl font-bold leading-relaxed text-muted-foreground italic">
                                 “{currentTopic?.description || "In-depth industrial analysis and technical mastery of the manufacturing core."}”
                             </p>
+
+                            <div className="pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-6">
+                                <div className="space-y-1">
+                                    <h4 className="font-black uppercase text-sm tracking-tight text-foreground">Topic Assignment</h4>
+                                    <p className="text-xs font-bold text-muted-foreground uppercase opacity-70">Submit your project or documentation for review.</p>
+                                </div>
+                                <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                                    {currentTopic?.assignmentUrl && (
+                                        <a href={currentTopic.assignmentUrl} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
+                                            <Button
+                                                variant="outline"
+                                                className="w-full h-14 px-8 text-sm font-black uppercase border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
+                                            >
+                                                <FileText className="mr-2 h-4 w-4" /> Instructions
+                                            </Button>
+                                        </a>
+                                    )}
+                                    <input
+                                        type="file"
+                                        id="topic-assignment-input"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file && currentTopicId) {
+                                                console.log("Uploading assignment for", currentTopicId, file);
+                                                alert("Topic assignment uploaded successfully!");
+                                                setTopics(prev => prev.map(t => t.id === currentTopicId ? { ...t, assignmentUploaded: true } : t));
+                                            }
+                                        }}
+                                    />
+                                    <Button
+                                        onClick={() => document.getElementById('topic-assignment-input')?.click()}
+                                        className="flex-1 sm:flex-none h-14 px-8 text-sm font-black uppercase border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] bg-background text-foreground hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
+                                    >
+                                        <Upload className="mr-2 h-4 w-4" /> Upload Work
+                                    </Button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     {/* Sidebar */}
-                    <div className="lg:col-span-4">
-                        <div className="sticky top-30 space-y-4">
-                            <div className="bg-foreground text-background p-6 border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-                                <h3 className="font-black uppercase tracking-tighter text-xl italic">Curriculum Plan</h3>
+                    <div className="lg:col-span-4 space-y-6">
+                        <div className="border-4 border-foreground bg-muted/30 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.05)] overflow-hidden">
+                            <div className="p-6 border-b-4 border-foreground bg-muted">
+                                <h3 className="text-lg font-black uppercase tracking-tighter">Course Blueprint</h3>
                             </div>
-
-                            <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-1">
-                                {topics.map((topic, index) => {
+                            <div className="max-h-[600px] overflow-y-auto p-4 space-y-3">
+                                {topics.map((topic, idx) => {
                                     const isActive = topic.id === currentTopicId
-                                    const isLocked = topic.isLocked
-                                    const isCompleted = topic.completed
-
                                     return (
                                         <button
                                             key={topic.id}
-                                            disabled={isLocked}
-                                            onClick={() => setCurrentTopicId(topic.id)}
+                                            onClick={() => !topic.isLocked && setCurrentTopicId(topic.id)}
                                             className={cn(
-                                                "w-full p-6 text-left border-4 transition-all duration-300",
-                                                isActive ? "bg-primary/10 border-primary translate-x-1" : "bg-card border-foreground/10 hover:border-foreground grayscale-[0.5] hover:grayscale-0",
-                                                isLocked && "opacity-20 cursor-not-allowed pointer-events-none"
+                                                "w-full flex items-center gap-4 p-4 text-left transition-all border-2",
+                                                isActive ? "bg-primary text-primary-foreground border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] -translate-x-1 -translate-y-1" :
+                                                    topic.isLocked ? "opacity-40 cursor-not-allowed border-transparent bg-muted/50" :
+                                                        "bg-card border-border hover:border-foreground/50 hover:bg-muted/5"
                                             )}
                                         >
-                                            <div className="flex items-center gap-4">
-                                                <span className="text-2xl font-black tabular-nums opacity-20 italic">0{index + 1}</span>
-                                                <div className="flex-1">
-                                                    <p className="font-black uppercase tracking-tighter text-sm leading-none">{topic.title}</p>
-                                                    <p className="text-[10px] font-bold text-muted-foreground mt-2 uppercase tracking-widest">{topic.duration > 60 ? `${Math.ceil(topic.duration / 60)} Mins` : `${topic.duration} Secs`}</p>
+                                            <div className={cn(
+                                                "h-10 w-10 flex items-center justify-center shrink-0 border-2",
+                                                isActive ? "bg-white text-primary border-white" :
+                                                    topic.completed ? "bg-emerald-500/10 text-emerald-600 border-emerald-600/20" :
+                                                        "bg-muted text-muted-foreground border-muted-foreground/10"
+                                            )}>
+                                                {topic.completed ? <CheckCircle className="h-5 w-5" /> : (isActive ? <Play className="h-5 w-5 fill-current" /> : <div className="text-xs font-black">{idx + 1}</div>)}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="text-xs font-black uppercase truncate">{topic.title}</span>
+                                                    {topic.isLocked && <Lock className="h-3 w-3 shrink-0" />}
                                                 </div>
-                                                {isCompleted ? <CheckCircle className="text-green-500 w-5 h-5" /> : isLocked ? <Lock className="w-4 h-4 text-muted-foreground" /> : null}
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <Clock className="h-3 w-3 opacity-50" />
+                                                    <span className="text-[10px] font-bold opacity-50 uppercase tabular-nums">
+                                                        {Math.floor(topic.duration / 60)}:{(topic.duration % 60).toString().padStart(2, '0')}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </button>
                                     )
                                 })}
 
                                 {topics.length > 0 && topics.every(t => t.completed) && (
-                                    <div className="mt-6 p-4 border-4 border-green-500/20 bg-green-500/5 rounded-xl">
+                                    <div className="pt-6 mt-6 border-t-4 border-foreground border-dashed space-y-4">
+                                        <div className="p-4 bg-primary/10 border-2 border-primary/20 rounded-xl text-center">
+                                            <h4 className="text-xs font-black uppercase text-primary mb-1">Course Complete</h4>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Final assessments unlocked</p>
+                                        </div>
                                         <Button
                                             onClick={() => navigate(`/courses/${courseId}/exam`)}
-                                            className="w-full h-14 text-lg font-black uppercase bg-green-500 text-black hover:bg-green-400 transition-all border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                                            className="w-full h-14 text-lg font-black uppercase border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] bg-foreground text-background hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
                                         >
                                             TAKE FINAL EXAM
-                                        </Button>
-                                        <Button
-                                            onClick={() => navigate(`/courses/${courseId}/assignment`)}
-                                            className="w-full h-14 mt-4 text-lg font-black uppercase bg-background text-foreground hover:bg-muted transition-all border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
-                                        >
-                                            COURSE ASSIGNMENT
                                         </Button>
                                     </div>
                                 )}
@@ -404,7 +388,6 @@ export default function CoursePlayerPage() {
                     </div>
                 </div>
             </main>
-
         </div>
     )
 }

@@ -5,6 +5,7 @@ import { Moon, Sun } from "lucide-react"
 
 
 import { Button } from "@/components/ui/Button"
+import { useTheme } from "@/components/ui/themeProvider"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -33,9 +34,9 @@ export function ThemeToggle() {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
+                <Button
+                    variant="ghost"
+                    size="icon"
                     className="h-8 w-8 rounded-full border-2 border-transparent hover:border-foreground hover:bg-muted text-foreground"
                     suppressHydrationWarning
                 >

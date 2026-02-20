@@ -4,13 +4,14 @@ import {
   ArrowLeft,
   Plus,
   Video,
-  FileQuestion,
   GripVertical,
   Trash2,
   Check,
   ChevronsUpDown,
   Loader2,
   Upload,
+  FileText,
+  Settings,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
@@ -40,12 +41,10 @@ import { cn } from "@/lib/utils";
 import { getCategories } from "@/api/categories";
 import { getLabs, getLabsForCourse, assignLabToCourse } from "@/api/labs";
 import { getCourseDetails, updateCourse, createCourse } from "@/api/courses";
-import { createTopic, updateTopic, deleteTopic, getTopicsByCourse } from "@/api/topics";
+import { createTopic, updateTopic, deleteTopic, getTopicsByCourse, uploadAssignment } from "@/api/topics";
 import { createVideo, updateVideo, uploadVideo } from "@/api/videos";
-import { QuizBuilder } from "@/components/admin/quiz-builder";
 import { CourseAssignmentManager } from "@/components/admin/course-assignment";
-import api from "@/api/axios";
-// import { updateCourse } from "@/api/courses.api"; // wire later
+import { TopicEditDialog } from "@/components/admin/topic-edit-dialog";
 
 interface Category {
   id: string;
@@ -76,8 +75,8 @@ export default function EditCoursePage() {
   const [selectedLabs, setSelectedLabs] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
-  const [quizTopic, setQuizTopic] = useState<any | null>(null);
-  const [isQuizBuilderOpen, setIsQuizBuilderOpen] = useState(false);
+  const [editTopic, setEditTopic] = useState<any>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   /* ------------------ load initial data ------------------ */
   useEffect(() => {
@@ -225,8 +224,30 @@ export default function EditCoursePage() {
     }
   };
 
-  // removeTopicAlias was redundant, removed.
+  const handleAssignmentFileUpload = async (topicId: string, file: File) => {
+    if (!file) return;
+    updateTopicLocal(topicId, { assignmentUploading: true, uploadError: "" });
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("topicId", topicId);
+      // formData.append("courseId", id!); // uploadAssignment generally relies on topicId
 
+      await uploadAssignment(formData);
+
+      updateTopicLocal(topicId, {
+        assignmentUploading: false,
+        assignmentUploaded: true
+      });
+      alert("Assignment uploaded successfully!");
+    } catch (e: any) {
+      console.error("Assignment upload failed", e);
+      updateTopicLocal(topicId, {
+        assignmentUploading: false,
+        uploadError: "Failed to upload assignment file."
+      });
+    }
+  };
 
   /* ------------------ labs ------------------ */
   const toggleLab = (labId: string) => {
@@ -369,20 +390,33 @@ export default function EditCoursePage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-7 px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:bg-muted"
-                            onClick={() => {
-                              setQuizTopic(topic);
-                              setIsQuizBuilderOpen(true);
-                            }}
+                            className={cn(
+                              "h-7 px-2 text-[10px] font-black uppercase tracking-wider transition-all",
+                              topic.assignmentUploaded
+                                ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
+                                : "text-muted-foreground hover:bg-muted"
+                            )}
+                            onClick={() => updateTopicLocal(topic.id, { showAssignmentSection: !topic.showAssignmentSection })}
                           >
-                            <FileQuestion className="h-3 w-3 mr-1.5" />
-                            QUIZ
+                            <FileText className="h-3 w-3 mr-1.5" />
+                            {topic.assignmentUploaded ? "ASSIGNMENT UPLOADED" : "UPLOAD ASSIGNMENT"}
                           </Button>
 
                         </div>
                       </div>
 
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:bg-muted"
+                          onClick={() => {
+                            setEditTopic(topic);
+                            setEditDialogOpen(true);
+                          }}
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
                         <Button
                           size="icon"
                           variant="ghost"
@@ -476,7 +510,7 @@ export default function EditCoursePage() {
                               id={`assignment-upload-${topic.id}`}
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
-                                if (file) console.log("File upload deprecated"); // handleAssignmentFileUpload(topic.id, file);
+                                if (file) handleAssignmentFileUpload(topic.id, file);
                               }}
                             />
                             <Button
@@ -519,24 +553,9 @@ export default function EditCoursePage() {
             </CardContent>
           </Card>
 
-          {/* Course Assignment Manager */}
+          {/* Final Exam Manager (Previously Course Assignment) */}
           <CourseAssignmentManager courseId={id!} />
 
-          {/* Quiz Builder Integration */}
-          {quizTopic && (
-            <QuizBuilder
-              topic={{
-                id: quizTopic.id,
-                title: quizTopic.title,
-                course_id: id!
-              }}
-              open={isQuizBuilderOpen}
-              onOpenChange={setIsQuizBuilderOpen}
-              onSuccess={() => {
-                console.log("Quiz updated for topic:", quizTopic.id);
-              }}
-            />
-          )}
         </div>
 
         {/* RIGHT */}
@@ -630,6 +649,15 @@ export default function EditCoursePage() {
           </Card>
         </div>
       </div>
+
+      <TopicEditDialog
+        topic={editTopic}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSuccess={() => {
+          loadInitialData(); // Reload all topics
+        }}
+      />
     </main>
   );
 }

@@ -29,5 +29,5 @@ export const getSignedUrl = (topicId: string) =>
   api.get("/video/signed-url", { params: { topicId } });
 
 // Update Video (Admin)
-export const updateVideo = (topicId: string, payload: { title?: string; url?: string }) =>
+export const updateVideo = (topicId: string, payload: { title?: string; url?: string; description?: string }) =>
   api.put(`/video/${topicId}`, payload);
