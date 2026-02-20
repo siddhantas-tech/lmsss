@@ -3,19 +3,23 @@ import { ActivityHeatmap } from "@/components/dashboard/ActivityHeatmap";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/badge";
 import { BookOpen, GraduationCap, Zap } from "lucide-react";
-import { getMyEnrollments } from "@/api/enrollments";
+import { getDashboardStats } from "@/api/dashboard";
 
 export default function DashboardPage() {
-    const [enrollmentCount, setEnrollmentCount] = useState(0);
+    const [dashboardData, setDashboardData] = useState({
+        enrolled: 0,
+        topicsCompleted: 0,
+        streak: 0
+    });
     const [activityData, setActivityData] = useState<Array<{ date: string; count: number }>>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Fetch enrollments
-                const enrollRes = await getMyEnrollments();
-                setEnrollmentCount(enrollRes.data?.length || 0);
+                // Fetch dashboard stats
+                const statsRes = await getDashboardStats();
+                setDashboardData(statsRes.data || { enrolled: 0, topicsCompleted: 0, streak: 0 });
 
                 // Generate activity data (empty for now, can be populated from backend)
                 const data = [];
@@ -40,9 +44,9 @@ export default function DashboardPage() {
     }, []);
 
     const stats = [
-        { title: "Enrolled", value: enrollmentCount.toString(), icon: BookOpen, color: "text-blue-500", bg: "bg-blue-500/10" },
-        { title: "Topics", value: "0", icon: GraduationCap, color: "text-green-500", bg: "bg-green-500/10" },
-        { title: "Streak", value: "0d", icon: Zap, color: "text-orange-500", bg: "bg-orange-500/10" },
+        { title: "Enrolled", value: dashboardData.enrolled.toString(), icon: BookOpen, color: "text-blue-500", bg: "bg-blue-500/10" },
+        { title: "Topics", value: dashboardData.topicsCompleted.toString(), icon: GraduationCap, color: "text-green-500", bg: "bg-green-500/10" },
+        { title: "Streak", value: `${dashboardData.streak}d`, icon: Zap, color: "text-orange-500", bg: "bg-orange-500/10" },
     ];
 
     if (loading) {

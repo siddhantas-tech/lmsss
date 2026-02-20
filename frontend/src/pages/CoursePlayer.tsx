@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { getQuizByTopic } from '@/api/quiz'
 import { getCourseDetails as fetchCourseDetails } from '@/api/courses'
 import { getTopicsByCourse } from '@/api/topics'
-import { TopicQuizModal } from '@/components/course/topic-quiz-modal'
+
 import { cn } from '@/lib/utils'
 
 interface QuizOption {
@@ -46,7 +46,7 @@ export default function CoursePlayerPage() {
     const [currentTopicId, setCurrentTopicId] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    const [isQuizOpen, setIsQuizOpen] = useState(false)
+
     const [videoError, setVideoError] = useState<string | null>(null)
     const [videoProgress, setVideoProgress] = useState(0)
 
@@ -159,7 +159,7 @@ export default function CoursePlayerPage() {
         maxTimeWatched.current = 0
         setVideoError(null)
         setVideoProgress(0)
-        setIsQuizOpen(false)
+
         if (videoRef.current) {
             videoRef.current.currentTime = 0
             videoRef.current.load() // Ensure video source refreshes correctly
@@ -200,7 +200,7 @@ export default function CoursePlayerPage() {
                 setVideoProgress((current / duration) * 100)
 
                 // Backup trigger if onEnded fails (within 0.3s of end)
-                if (duration - current < 0.3 && !isQuizOpen) {
+                if (duration - current < 0.3) {
                     handleVideoEnded()
                 }
             }
@@ -209,13 +209,8 @@ export default function CoursePlayerPage() {
     }
 
     const handleVideoEnded = () => {
-        if (isQuizOpen) return
-
         const topic = topics.find(t => t.id === currentTopicId)
-
-        if (topic && topic.questions && topic.questions.length > 0) {
-            setIsQuizOpen(true)
-        } else if (topic) {
+        if (topic && !topic.completed) {
             completeTopic(currentTopicId!)
         }
     }
@@ -233,20 +228,7 @@ export default function CoursePlayerPage() {
         })
     }
 
-    const handleQuizSubmit = (score: number) => {
-        if (score >= 85) {
-            completeTopic(currentTopicId!)
-            setIsQuizOpen(false)
-        } else {
-            // Reset video for retry
-            setIsQuizOpen(false)
-            if (videoRef.current) {
-                videoRef.current.currentTime = 0
-                maxTimeWatched.current = 0
-                setVideoProgress(0)
-            }
-        }
-    }
+
 
     const currentTopic = topics.find(t => t.id === currentTopicId)
 
@@ -400,22 +382,23 @@ export default function CoursePlayerPage() {
                                         </button>
                                     )
                                 })}
+
+                                {topics.length > 0 && topics.every(t => t.completed) && (
+                                    <div className="mt-6 p-4 border-4 border-green-500/20 bg-green-500/5 rounded-xl">
+                                        <Button
+                                            onClick={() => navigate(`/courses/${courseId}/exam`)}
+                                            className="w-full h-14 text-lg font-black uppercase bg-green-500 text-black hover:bg-green-400 transition-all border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                                        >
+                                            TAKE FINAL EXAM
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
             </main>
 
-            {/* THE POP-UP BOX (Modal) */}
-            {currentTopic && (
-                <TopicQuizModal
-                    isOpen={isQuizOpen}
-                    topicTitle={currentTopic.title}
-                    questions={currentTopic.questions}
-                    onClose={() => setIsQuizOpen(false)}
-                    onSubmit={handleQuizSubmit}
-                />
-            )}
         </div>
     )
 }

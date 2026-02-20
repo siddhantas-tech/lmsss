@@ -43,6 +43,7 @@ import { getCourseDetails, updateCourse, createCourse } from "@/api/courses";
 import { createTopic, updateTopic, deleteTopic, getTopicsByCourse } from "@/api/topics";
 import { createVideo, updateVideo, uploadVideo } from "@/api/videos";
 import { QuizBuilder } from "@/components/admin/quiz-builder";
+import { CourseAssignmentManager } from "@/components/admin/course-assignment";
 import api from "@/api/axios";
 // import { updateCourse } from "@/api/courses.api"; // wire later
 
@@ -115,7 +116,9 @@ export default function EditCoursePage() {
             ...t,
             videoUrl: topicVideo?.url || t.video_url || "",
             videoId: topicVideo?.id || t.video_id,
-            showVideoSection: false
+            showVideoSection: false,
+            showAssignmentSection: false,
+            assignmentUploaded: !!t.assignment_url
           };
         }));
       }
@@ -223,6 +226,7 @@ export default function EditCoursePage() {
   };
 
   // removeTopicAlias was redundant, removed.
+
 
   /* ------------------ labs ------------------ */
   const toggleLab = (labId: string) => {
@@ -374,6 +378,7 @@ export default function EditCoursePage() {
                             <FileQuestion className="h-3 w-3 mr-1.5" />
                             QUIZ
                           </Button>
+
                         </div>
                       </div>
 
@@ -457,6 +462,49 @@ export default function EditCoursePage() {
                         )}
                       </div>
                     ) : null}
+
+                    {/* ASSIGNMENT SECTION */}
+                    {topic.showAssignmentSection ? (
+                      <div className="mt-4 rounded-lg border bg-muted/30 p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="space-y-4">
+                          <Label className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">Upload Assignment File</Label>
+                          <div className="relative">
+                            <Input
+                              type="file"
+                              accept=".pdf,.doc,.docx,.txt"
+                              className="hidden"
+                              id={`assignment-upload-${topic.id}`}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) console.log("File upload deprecated"); // handleAssignmentFileUpload(topic.id, file);
+                              }}
+                            />
+                            <Button
+                              variant="outline"
+                              className="w-full border-2 border-dashed border-primary/20 hover:border-primary/50 hover:bg-primary/5 h-20 flex flex-col gap-2 font-bold transition-all items-center justify-center p-4"
+                              onClick={() => document.getElementById(`assignment-upload-${topic.id}`)?.click()}
+                              disabled={topic.assignmentUploading}
+                            >
+                              <Upload className="h-6 w-6" />
+                              {topic.assignmentUploading ? "UPLOADING ASSIGNMENT..." : "CHOOSE DOCUMENT"}
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground font-medium italic text-center">
+                            Supported formats: PDF, DOC, DOCX, TXT. Max size 10MB.
+                          </p>
+                        </div>
+
+                        {topic.uploadError && topic.showAssignmentSection ? (
+                          <div className="text-xs font-bold text-destructive bg-destructive/10 p-2 rounded border border-destructive/20">{topic.uploadError}</div>
+                        ) : null}
+
+                        {topic.assignmentUploaded && (
+                          <div className="flex items-center gap-2 text-[10px] font-black text-emerald-500 bg-emerald-500/10 w-fit px-2.5 py-1 rounded-full border border-emerald-500/20">
+                            <Check className="h-3 w-3" /> ASSIGNMENT ATTACHED
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -470,6 +518,9 @@ export default function EditCoursePage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Course Assignment Manager */}
+          <CourseAssignmentManager courseId={id!} />
 
           {/* Quiz Builder Integration */}
           {quizTopic && (

@@ -1,6 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import CoursesPage from './pages/Courses';
 import CoursePlayer from './pages/CoursePlayer';
+import CourseExamPage from './pages/CourseExam';
+import CourseAssignmentPage from './pages/CourseAssignment';
 import DashboardPage from './pages/Dashboard';
 import CategoriesPage from './pages/Categories';
 import CategoryDetailPage from './pages/CategoryDetail';
@@ -73,6 +75,8 @@ function AppContent() {
 
             {/* Focus Mode Routes */}
             <Route path="/courses/:id" element={<CoursePlayer />} />
+            <Route path="/courses/:id/exam" element={<CourseExamPage />} />
+            <Route path="/courses/:id/assignment" element={<CourseAssignmentPage />} />
             <Route path="/exams/:id" element={<PagePlaceholder title="Exam Simulation" />} />
 
             {/* 404 Redirect: If no route matches, send them to /courses */}

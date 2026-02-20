@@ -11,3 +11,10 @@ export const updateTopic = (id: string, data: { title?: string; orderIndex?: num
 
 export const deleteTopic = (id: string) =>
     api.delete(`/topics/${id}`);
+
+export const uploadAssignment = (formData: FormData) =>
+    api.post("/topics/assignment", formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
