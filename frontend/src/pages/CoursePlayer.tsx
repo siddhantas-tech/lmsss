@@ -391,6 +391,12 @@ export default function CoursePlayerPage() {
                                         >
                                             TAKE FINAL EXAM
                                         </Button>
+                                        <Button
+                                            onClick={() => navigate(`/courses/${courseId}/assignment`)}
+                                            className="w-full h-14 mt-4 text-lg font-black uppercase bg-background text-foreground hover:bg-muted transition-all border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                                        >
+                                            COURSE ASSIGNMENT
+                                        </Button>
                                     </div>
                                 )}
                             </div>
