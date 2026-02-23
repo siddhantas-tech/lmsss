@@ -31,3 +31,7 @@ export const getSignedUrl = (topicId: string) =>
 // Update Video (Admin)
 export const updateVideo = (topicId: string, payload: { title?: string; url?: string; description?: string }) =>
   api.put(`/video/${topicId}`, payload);
+
+// Delete Video (Admin)
+export const deleteVideo = (id: string) =>
+  api.delete(`/video/${id}`);

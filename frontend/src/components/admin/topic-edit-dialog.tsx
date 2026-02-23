@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, Upload, Video as VideoIcon, Plus, Trash2, ExternalLink } from 'lucide-react'
-import { updateVideo, uploadVideo, createVideo } from '@/api/videos'
+import { Loader2, Upload, Plus, Trash2, ExternalLink } from 'lucide-react'
+import { updateVideo, uploadVideo, createVideo, deleteVideo } from '@/api/videos'
 import { Textarea } from '@/components/ui/textarea'
 
 interface TopicEditDialogProps {
@@ -94,6 +94,21 @@ export function TopicEditDialog({
     } finally {
       setUploading(false)
       e.target.value = ''
+    }
+  }
+
+  async function handleDeleteVideo(videoId: string) {
+    if (!confirm('CONFIRM ACTION: This media asset will be permanently removed. Continue?')) return;
+    setLoading(true);
+    try {
+      await deleteVideo(videoId);
+      onSuccess(); // Reload parent/siblings
+      setVideos(prev => prev.filter(v => v.id !== videoId));
+    } catch (err) {
+      console.error(err);
+      alert('SYSTEM ERROR: Could not remove media asset.');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -186,7 +201,12 @@ export function TopicEditDialog({
                           <ExternalLink className="h-4 w-4" />
                         </Button>
                       </a>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => handleDeleteVideo(v.id)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
