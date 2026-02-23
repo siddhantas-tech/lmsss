@@ -10,7 +10,6 @@ import {
   ChevronsUpDown,
   Loader2,
   Upload,
-  FileText,
   Settings,
 } from "lucide-react";
 
@@ -41,7 +40,7 @@ import { cn } from "@/lib/utils";
 import { getCategories } from "@/api/categories";
 import { getLabs, getLabsForCourse, assignLabToCourse } from "@/api/labs";
 import { getCourseDetails, updateCourse, createCourse } from "@/api/courses";
-import { createTopic, updateTopic, deleteTopic, getTopicsByCourse, uploadAssignment } from "@/api/topics";
+import { createTopic, updateTopic, deleteTopic, getTopicsByCourse } from "@/api/topics";
 import { createVideo, updateVideo, uploadVideo } from "@/api/videos";
 import { CourseAssignmentManager } from "@/components/admin/course-assignment";
 import { TopicEditDialog } from "@/components/admin/topic-edit-dialog";
@@ -84,13 +83,14 @@ export default function EditCoursePage() {
   }, []);
 
   const loadInitialData = async () => {
+    if (!id) return;
     try {
       const [catRes, labRes, courseRes, assignedLabsRes, topicsRes] = await Promise.all([
         getCategories(),
         getLabs(),
-        getCourseDetails(id!),
-        getLabsForCourse(id!),
-        getTopicsByCourse(id!),
+        getCourseDetails(id),
+        getLabsForCourse(id),
+        getTopicsByCourse(id),
       ]);
 
       setCategories(Array.isArray(catRes.data) ? catRes.data : []);
@@ -110,14 +110,17 @@ export default function EditCoursePage() {
 
       if (Array.isArray(topicsRes.data)) {
         setTopics(topicsRes.data.map((t: any) => {
-          const topicVideo = (Array.isArray(t.videos) && t.videos.length > 0) ? t.videos[0] : null;
+          // Support multiple videos per topic
+          const allVideos = Array.isArray(t.videos) && t.videos.length > 0
+            ? t.videos
+            : (t.video_url ? [{ id: t.id + '-v', url: t.video_url }] : []);
+          const topicVideo = allVideos[0] || null;
           return {
             ...t,
             videoUrl: topicVideo?.url || t.video_url || "",
             videoId: topicVideo?.id || t.video_id,
+            videos: allVideos,
             showVideoSection: false,
-            showAssignmentSection: false,
-            assignmentUploaded: !!t.assignment_url
           };
         }));
       }
@@ -139,6 +142,7 @@ export default function EditCoursePage() {
         ...res.data,
         videoUrl: "",
         videoId: undefined,
+        videos: [],
         showVideoSection: false
       };
 
@@ -224,32 +228,6 @@ export default function EditCoursePage() {
     }
   };
 
-  const handleAssignmentFileUpload = async (topicId: string, file: File) => {
-    if (!file) return;
-    updateTopicLocal(topicId, { assignmentUploading: true, uploadError: "" });
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("topicId", topicId);
-      // formData.append("courseId", id!); // uploadAssignment generally relies on topicId
-
-      await uploadAssignment(formData);
-
-      updateTopicLocal(topicId, {
-        assignmentUploading: false,
-        assignmentUploaded: true
-      });
-      alert("Assignment uploaded successfully!");
-    } catch (e: any) {
-      console.error("Assignment upload failed", e);
-      updateTopicLocal(topicId, {
-        assignmentUploading: false,
-        uploadError: "Failed to upload assignment file."
-      });
-    }
-  };
-
-  /* ------------------ labs ------------------ */
   const toggleLab = (labId: string) => {
     setSelectedLabs((prev) =>
       prev.includes(labId)
@@ -257,7 +235,6 @@ export default function EditCoursePage() {
         : [...prev, labId]
     );
   };
-
 
   const handleSave = async () => {
     if (!course.title.trim() || !course.description.trim() || !course.categoryId) {
@@ -274,10 +251,8 @@ export default function EditCoursePage() {
       if (id) {
         await updateCourse(id, payload);
         await assignLabToCourse(id, selectedLabs);
-        // Course updated
       } else {
         await createCourse(payload);
-        // Course created
       }
       navigate('/admin/courses');
     } catch (err: any) {
@@ -287,7 +262,6 @@ export default function EditCoursePage() {
     }
   };
 
-  /* ------------------ UI ------------------ */
   return (
     <main className="w-full max-w-7xl mx-auto px-8 py-8">
       {/* Header */}
@@ -315,7 +289,6 @@ export default function EditCoursePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* LEFT */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Course */}
           <Card>
             <CardHeader>
               <CardTitle>Course Details</CardTitle>
@@ -338,7 +311,6 @@ export default function EditCoursePage() {
             </CardContent>
           </Card>
 
-          {/* Topics */}
           <Card className="border-2 shadow-sm">
             <CardHeader className="flex justify-between flex-row items-center border-b bg-muted/30 pb-4">
               <div>
@@ -385,23 +357,12 @@ export default function EditCoursePage() {
                             onClick={() => updateTopicLocal(topic.id, { showVideoSection: !topic.showVideoSection })}
                           >
                             <Video className="h-3 w-3 mr-1.5" />
-                            {topic.videoUrl ? "VIDEO LINKED" : "ADD VIDEO"}
+                            {topic.videos?.length > 1
+                              ? `${topic.videos.length} VIDEOS`
+                              : topic.videoUrl
+                                ? "VIDEO LINKED"
+                                : "ADD VIDEO"}
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className={cn(
-                              "h-7 px-2 text-[10px] font-black uppercase tracking-wider transition-all",
-                              topic.assignmentUploaded
-                                ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
-                                : "text-muted-foreground hover:bg-muted"
-                            )}
-                            onClick={() => updateTopicLocal(topic.id, { showAssignmentSection: !topic.showAssignmentSection })}
-                          >
-                            <FileText className="h-3 w-3 mr-1.5" />
-                            {topic.assignmentUploaded ? "ASSIGNMENT UPLOADED" : "UPLOAD ASSIGNMENT"}
-                          </Button>
-
                         </div>
                       </div>
 
@@ -428,10 +389,9 @@ export default function EditCoursePage() {
                       </div>
                     </div>
 
-                    {topic.showVideoSection ? (
+                    {topic.showVideoSection && (
                       <div className="mt-4 rounded-lg border bg-muted/30 p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {/* URL Input */}
                           <div className="space-y-2">
                             <Label className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">Video Content URL</Label>
                             <div className="flex gap-2">
@@ -450,44 +410,35 @@ export default function EditCoursePage() {
                                 {topic.uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : "APPLY"}
                               </Button>
                             </div>
-                            <p className="text-[10px] text-muted-foreground font-medium italic">
-                              Paste a direct video URL (MP4, YouTube, HLS)
-                            </p>
                           </div>
 
-                          {/* File Upload */}
                           <div className="space-y-2">
                             <Label className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">Upload from Computer</Label>
-                            <div className="relative">
-                              <Input
-                                type="file"
-                                accept="video/*"
-                                className="hidden"
-                                id={`file-upload-${topic.id}`}
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) handleVideoFileUpload(topic.id, file);
-                                }}
-                              />
-                              <Button
-                                variant="outline"
-                                className="w-full border-2 border-dashed border-primary/20 hover:border-primary/50 hover:bg-primary/5 h-10 flex gap-2 font-bold transition-all"
-                                onClick={() => document.getElementById(`file-upload-${topic.id}`)?.click()}
-                                disabled={topic.uploading}
-                              >
-                                <Upload className="h-4 w-4" />
-                                {topic.uploading ? "UPLOADING..." : "CHOOSE FILE"}
-                              </Button>
-                            </div>
-                            <p className="text-[10px] text-muted-foreground font-medium italic">
-                              Upload directly to Supabase Storage
-                            </p>
+                            <input
+                              type="file"
+                              accept="video/*"
+                              className="hidden"
+                              id={`file-upload-${topic.id}`}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleVideoFileUpload(topic.id, file);
+                              }}
+                            />
+                            <Button
+                              variant="outline"
+                              className="w-full border-2 border-dashed border-primary/20 hover:border-primary/50 hover:bg-primary/5 h-10 flex gap-2 font-bold transition-all"
+                              onClick={() => document.getElementById(`file-upload-${topic.id}`)?.click()}
+                              disabled={topic.uploading}
+                            >
+                              <Upload className="h-4 w-4" />
+                              {topic.uploading ? "UPLOADING..." : "CHOOSE FILE"}
+                            </Button>
                           </div>
                         </div>
 
-                        {topic.uploadError ? (
+                        {topic.uploadError && (
                           <div className="text-xs font-bold text-destructive bg-destructive/10 p-2 rounded border border-destructive/20">{topic.uploadError}</div>
-                        ) : null}
+                        )}
 
                         {topic.videoId && (
                           <div className="flex items-center gap-2 text-[10px] font-black text-emerald-500 bg-emerald-500/10 w-fit px-2.5 py-1 rounded-full border border-emerald-500/20">
@@ -495,50 +446,7 @@ export default function EditCoursePage() {
                           </div>
                         )}
                       </div>
-                    ) : null}
-
-                    {/* ASSIGNMENT SECTION */}
-                    {topic.showAssignmentSection ? (
-                      <div className="mt-4 rounded-lg border bg-muted/30 p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                        <div className="space-y-4">
-                          <Label className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">Upload Assignment File</Label>
-                          <div className="relative">
-                            <Input
-                              type="file"
-                              accept=".pdf,.doc,.docx,.txt"
-                              className="hidden"
-                              id={`assignment-upload-${topic.id}`}
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) handleAssignmentFileUpload(topic.id, file);
-                              }}
-                            />
-                            <Button
-                              variant="outline"
-                              className="w-full border-2 border-dashed border-primary/20 hover:border-primary/50 hover:bg-primary/5 h-20 flex flex-col gap-2 font-bold transition-all items-center justify-center p-4"
-                              onClick={() => document.getElementById(`assignment-upload-${topic.id}`)?.click()}
-                              disabled={topic.assignmentUploading}
-                            >
-                              <Upload className="h-6 w-6" />
-                              {topic.assignmentUploading ? "UPLOADING ASSIGNMENT..." : "CHOOSE DOCUMENT"}
-                            </Button>
-                          </div>
-                          <p className="text-[10px] text-muted-foreground font-medium italic text-center">
-                            Supported formats: PDF, DOC, DOCX, TXT. Max size 10MB.
-                          </p>
-                        </div>
-
-                        {topic.uploadError && topic.showAssignmentSection ? (
-                          <div className="text-xs font-bold text-destructive bg-destructive/10 p-2 rounded border border-destructive/20">{topic.uploadError}</div>
-                        ) : null}
-
-                        {topic.assignmentUploaded && (
-                          <div className="flex items-center gap-2 text-[10px] font-black text-emerald-500 bg-emerald-500/10 w-fit px-2.5 py-1 rounded-full border border-emerald-500/20">
-                            <Check className="h-3 w-3" /> ASSIGNMENT ATTACHED
-                          </div>
-                        )}
-                      </div>
-                    ) : null}
+                    )}
                   </div>
                 ))}
               </div>
@@ -553,14 +461,10 @@ export default function EditCoursePage() {
             </CardContent>
           </Card>
 
-          {/* Final Exam Manager (Previously Course Assignment) */}
           <CourseAssignmentManager courseId={id!} />
-
         </div>
 
-        {/* RIGHT */}
         <div className="space-y-8">
-          {/* Category */}
           <Card>
             <CardHeader>
               <CardTitle>Category</CardTitle>
@@ -586,7 +490,6 @@ export default function EditCoursePage() {
             </CardContent>
           </Card>
 
-          {/* Labs */}
           <Card>
             <CardHeader>
               <CardTitle>Labs</CardTitle>
@@ -655,7 +558,7 @@ export default function EditCoursePage() {
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         onSuccess={() => {
-          loadInitialData(); // Reload all topics
+          loadInitialData();
         }}
       />
     </main>

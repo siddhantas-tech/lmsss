@@ -1,21 +1,34 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
-import { createAssignment, getAssignmentByCourse, getAssignmentSubmissions, evaluateSubmission, deleteAssignment, updateAssignment, uploadAssignmentFile } from "@/api/assignments";
+import {
+    createAssignment,
+    getAssignmentByCourse,
+    getAssignmentSubmissions,
+    evaluateSubmission,
+    deleteAssignment,
+    updateAssignment,
+    uploadAssignmentFile
+} from "@/api/assignments";
 import { getQuestions, createQuestion, deleteQuestion } from "@/api/quiz";
-import { Loader2, Trash2, Check, ExternalLink, Plus, Save, FileText, LayoutGrid, Upload } from "lucide-react";
+import {
+    Loader2, Trash2, Check, ExternalLink, Plus, Save,
+    FileText, LayoutGrid, Upload, BookOpen, PenTool, Activity,
+    ShieldCheck, AlertCircle
+} from "lucide-react";
 
 export function CourseAssignmentManager({ courseId }: { courseId: string }) {
+    const navigate = useNavigate();
     const [assignment, setAssignment] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [submissions, setSubmissions] = useState<any[]>([]);
     const [showSubmissions, setShowSubmissions] = useState(false);
     const [questions, setQuestions] = useState<any[]>([]);
-    const [loadingQuestions, setLoadingQuestions] = useState(false);
 
     // Question Form
     const [qForm, setQForm] = useState({
@@ -28,12 +41,12 @@ export function CourseAssignmentManager({ courseId }: { courseId: string }) {
         ]
     });
 
-    // Form state
+    // Form state for assignment settings
     const [form, setForm] = useState({ title: "", description: "", max_marks: "100", passing_marks: "40" });
     const [isEditing, setIsEditing] = useState(false);
     const [uploadingRef, setUploadingRef] = useState(false);
 
-    // Load assignment
+    // Load initial data
     useEffect(() => {
         if (!courseId) return;
         loadAssignment();
@@ -41,14 +54,11 @@ export function CourseAssignmentManager({ courseId }: { courseId: string }) {
     }, [courseId]);
 
     const loadQuestions = async () => {
-        setLoadingQuestions(true);
         try {
             const res = await getQuestions({ courseId });
-            setQuestions(Array.isArray(res.data) ? res.data : []);
+            setQuestions(Array.isArray(res.data) ? res.data.filter((q: any) => q.is_final_exam) : []);
         } catch (e) {
             console.error("Failed to load questions", e);
-        } finally {
-            setLoadingQuestions(false);
         }
     };
 
@@ -57,6 +67,14 @@ export function CourseAssignmentManager({ courseId }: { courseId: string }) {
         try {
             const res = await getAssignmentByCourse(courseId);
             setAssignment(res.data);
+            if (res.data) {
+                setForm({
+                    title: res.data.title || "",
+                    description: res.data.description || "",
+                    max_marks: String(res.data.max_marks || 100),
+                    passing_marks: String(res.data.passing_marks || 40)
+                });
+            }
         } catch (e) {
             setAssignment(null);
         } finally {
@@ -65,6 +83,7 @@ export function CourseAssignmentManager({ courseId }: { courseId: string }) {
     };
 
     const handleCreate = async () => {
+        if (!form.title) return alert("Title required");
         try {
             await createAssignment({
                 course_id: courseId,
@@ -75,7 +94,7 @@ export function CourseAssignmentManager({ courseId }: { courseId: string }) {
             loadAssignment();
         } catch (e) {
             console.error(e);
-            alert("Failed to initialize exam. Please ensure the backend supports assignment creation.");
+            alert("Failed to initialize course-level assessment.");
         }
     };
 
@@ -89,10 +108,10 @@ export function CourseAssignmentManager({ courseId }: { courseId: string }) {
             });
             setIsEditing(false);
             loadAssignment();
-            alert("Assignment configuration updated securely.");
+            alert("Assessment settings updated.");
         } catch (e) {
             console.error(e);
-            alert("Update failed. Backend support for patch/put admin/assignments may be missing.");
+            alert("Update failed.");
         }
     };
 
@@ -103,22 +122,20 @@ export function CourseAssignmentManager({ courseId }: { courseId: string }) {
             formData.append("file", file);
             await uploadAssignmentFile(assignment.id, formData);
             loadAssignment();
-            setUploadingRef(false);
-            alert("Instruction Sheet uploaded and linked to exam.");
+            alert("Assignment Instruction Sheet uploaded.");
         } catch (e) {
             console.error(e);
+            alert("Upload failed.");
+        } finally {
             setUploadingRef(false);
-            alert("Upload failed. Backend support for admin/assignments/:id/upload may be missing.");
         }
     };
 
     const handleDelete = async () => {
-        if (!confirm("Delete assignment?")) return;
+        if (!confirm("Are you sure? This deletes the assignment and projects.")) return;
         try {
             await deleteAssignment(assignment.id);
             setAssignment(null);
-            setSubmissions([]);
-            setShowSubmissions(false);
         } catch (e) { console.error(e); }
     };
 
@@ -134,7 +151,8 @@ export function CourseAssignmentManager({ courseId }: { courseId: string }) {
     const handleEvaluate = async (subId: string, marks: number) => {
         try {
             await evaluateSubmission(subId, { marks_awarded: marks });
-            loadSubmissions(); // Refresh
+            loadSubmissions();
+            alert("Grade submitted.");
         } catch (e) { console.error(e); }
     };
 
@@ -169,291 +187,323 @@ export function CourseAssignmentManager({ courseId }: { courseId: string }) {
         } catch (e) { console.error(e); }
     };
 
-    if (loading) return <div className="p-4"><Loader2 className="animate-spin" /></div>;
+    if (loading) return (
+        <div className="p-12 border-4 border-dashed border-muted rounded-3xl flex items-center justify-center">
+            <Loader2 className="animate-spin text-muted-foreground" />
+        </div>
+    );
 
     if (!assignment) {
         return (
-            <Card className="border-l-4 border-l-primary/50">
-                <CardHeader>
-                    <CardTitle className="text-lg font-black uppercase">Create Final Exam</CardTitle>
-                    <p className="text-xs text-muted-foreground uppercase font-bold">Configure the course final assessment</p>
+            <Card className="border-4 border-foreground shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] overflow-hidden">
+                <CardHeader className="bg-foreground text-background p-8">
+                    <div className="flex items-center gap-3 uppercase font-black tracking-tighter text-2xl">
+                        <ShieldCheck className="w-8 h-8" />
+                        Final Assessment Engine
+                    </div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">Initialize the concluding project and MCQ exam</p>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <Label>Exam Title</Label>
-                        <Input placeholder="Final Exam 2024" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Exam Description / Instructions</Label>
-                        <Textarea placeholder="Describe the exam rules, duration, and requirements..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
+                <CardContent className="p-8 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                            <Label>Max Marks</Label>
-                            <Input type="number" placeholder="100" value={form.max_marks} onChange={e => setForm({ ...form, max_marks: e.target.value })} />
+                            <Label className="uppercase font-black text-[10px] tracking-widest">Assessment Identity</Label>
+                            <Input placeholder="e.g. Master Certification Exam" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="border-2 border-foreground h-12 font-bold" />
                         </div>
-                        <div className="space-y-2">
-                            <Label>Passing Marks</Label>
-                            <Input type="number" placeholder="40" value={form.passing_marks} onChange={e => setForm({ ...form, passing_marks: e.target.value })} />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label className="uppercase font-black text-[10px] tracking-widest text-primary">Total Weightage</Label>
+                                <Input type="number" value={form.max_marks} onChange={e => setForm({ ...form, max_marks: e.target.value })} className="border-2 border-primary h-12 font-black text-center" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="uppercase font-black text-[10px] tracking-widest">Pass Criteria</Label>
+                                <Input type="number" value={form.passing_marks} onChange={e => setForm({ ...form, passing_marks: e.target.value })} className="border-2 border-foreground h-12 font-black text-center" />
+                            </div>
                         </div>
                     </div>
-                    <Button onClick={handleCreate} className="font-bold uppercase">Initialize Exam</Button>
+                    <div className="space-y-2">
+                        <Label className="uppercase font-black text-[10px] tracking-widest">Administrative Brief & Instructions</Label>
+                        <Textarea placeholder="Detail the exam protocol, project scope, and submission guidelines..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="border-2 border-foreground min-h-[120px]" />
+                    </div>
+                    <Button onClick={handleCreate} className="w-full h-16 bg-foreground text-background font-black uppercase tracking-widest border-4 border-foreground shadow-[6px_6px_0px_0px_rgba(0,0,0,0.2)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all">
+                        DEPLOY ASSESSMENT ENGINE
+                    </Button>
                 </CardContent>
             </Card>
         );
     }
 
     return (
-        <Card className="border-l-4 border-l-primary">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg font-black uppercase">Final Exam: {assignment.title}</CardTitle>
-                <div className="flex gap-2">
-                    {assignment.file_url && (
-                        <a href={assignment.file_url} target="_blank" rel="noopener noreferrer">
-                            <Button variant="ghost" size="icon" className="text-primary hover:bg-primary/10">
-                                <FileText className="w-4 h-4" />
-                            </Button>
-                        </a>
-                    )}
-                    <Button variant="ghost" size="icon" onClick={handleDelete} className="text-destructive hover:bg-destructive/10">
-                        <Trash2 className="w-4 h-4" />
-                    </Button>
-                </div>
-            </CardHeader>
-            <CardContent className="p-8 space-y-8">
-                {isEditing ? (
-                    <div className="space-y-6 animate-in slide-in-from-top-4 duration-300">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest">Exam Title</Label>
-                                <Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="border-2 border-foreground" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest">Max Marks</Label>
-                                    <Input type="number" value={form.max_marks} onChange={e => setForm({ ...form, max_marks: e.target.value })} className="border-2 border-foreground" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest">Pass Marks</Label>
-                                    <Input type="number" value={form.passing_marks} onChange={e => setForm({ ...form, passing_marks: e.target.value })} className="border-2 border-foreground" />
-                                </div>
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase tracking-widest">Instructions</Label>
-                            <Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="border-2 border-foreground min-h-[120px]" />
-                        </div>
-                        <div className="flex gap-3 pt-4 border-t-2 border-dashed border-border">
-                            <Button onClick={handleUpdate} className="flex-1 font-black uppercase tracking-widest bg-primary text-white">Save Changes</Button>
-                            <Button variant="outline" onClick={() => setIsEditing(false)} className="px-8 font-black uppercase tracking-widest border-2 border-foreground">Cancel</Button>
-                        </div>
+        <div className="space-y-10">
+            {/* Main Config Card */}
+            <Card className="border-4 border-foreground shadow-[12px_12px_0px_0px_rgba(0,0,0,0.05)] overflow-hidden">
+                <CardHeader className="bg-muted p-6 border-b-4 border-foreground flex flex-row items-center justify-between">
+                    <div>
+                        <span className="text-[10px] font-black uppercase text-primary tracking-widest">Final Phase</span>
+                        <CardTitle className="text-2xl font-black uppercase tracking-tighter italic leading-none">{assignment.title}</CardTitle>
                     </div>
-                ) : (
-                    <div className="bg-muted/5 p-8 rounded-2xl border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,0.05)] space-y-8">
-                        <div className="space-y-4">
-                            <h4 className="text-[10px] font-black uppercase text-primary tracking-[0.2em]">Administrative Briefing</h4>
-                            <p className="text-lg font-bold italic leading-relaxed text-muted-foreground">“{assignment.description}”</p>
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 pt-6 border-t-2 border-dashed border-foreground/10">
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-black uppercase text-muted-foreground">Evaluation weight</p>
-                                <p className="text-xl font-black">{assignment.max_marks} MARKS</p>
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-black uppercase text-muted-foreground">Success line</p>
-                                <p className="text-xl font-black text-emerald-500">{assignment.passing_marks} MARKS</p>
-                            </div>
-                            <div className="sm:col-span-2 flex items-end justify-end gap-3">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                        setForm({ title: assignment.title, description: assignment.description, max_marks: String(assignment.max_marks), passing_marks: String(assignment.passing_marks) });
-                                        setIsEditing(true);
-                                    }}
-                                    className="font-black uppercase tracking-widest text-[10px] border-2 border-foreground hover:bg-foreground hover:text-white transition-all h-10 px-6"
-                                >
-                                    Reconfigure Exam
-                                </Button>
-                            </div>
-                        </div>
-
-                        <div className="pt-8 border-t-4 border-foreground">
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-                                <div className="space-y-1">
-                                    <h5 className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                                        <FileText className="w-4 h-4 text-primary" /> Instruction Sheet
-                                    </h5>
-                                    <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-60">Reference document for industrial project</p>
-                                </div>
-                                <div className="flex items-center gap-4 w-full sm:w-auto">
-                                    {assignment.file_url ? (
-                                        <div className="px-4 py-2 bg-emerald-500/10 border-2 border-emerald-500 rounded-lg flex items-center gap-3">
-                                            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                                            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Active Document Linked</span>
-                                        </div>
-                                    ) : (
-                                        <span className="text-[10px] font-black text-destructive uppercase tracking-widest px-3 py-1 bg-destructive/5 rounded-full border border-destructive/20">Missing Documentation</span>
-                                    )}
-                                    <input
-                                        type="file"
-                                        id="exam-ref-upload"
-                                        className="hidden"
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) handleRefFileUpload(file);
-                                        }}
-                                    />
-                                    <Button
-                                        disabled={uploadingRef}
-                                        onClick={() => document.getElementById('exam-ref-upload')?.click()}
-                                        className="font-black uppercase tracking-widest text-[10px] border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] bg-background text-foreground hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all h-12 px-8"
-                                    >
-                                        {uploadingRef ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-                                        {assignment.file_url ? "Change Reference" : "Upload Reference"}
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                <div className="border-t pt-8 space-y-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h4 className="font-black uppercase text-sm">Exam Paper: Questions</h4>
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Design the final test questions</p>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={loadQuestions} disabled={loadingQuestions}>
-                            {loadingQuestions ? <Loader2 className="w-4 h-4 animate-spin" /> : "Refresh"}
+                    <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setIsEditing(!isEditing)} className="border-2 border-foreground hover:bg-foreground hover:text-background">
+                            <PenTool className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={handleDelete} className="border-2 border-destructive text-destructive hover:bg-destructive hover:text-white">
+                            <Trash2 className="w-4 h-4" />
                         </Button>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* Question List */}
-                        <div className="space-y-4">
-                            {questions.map((q, idx) => (
-                                <div key={q.id} className="p-4 border-2 rounded-xl bg-muted/5 relative group">
-                                    <p className="text-xs font-black uppercase text-primary mb-2">Question {idx + 1}</p>
-                                    <p className="font-bold text-sm mb-4">{q.question_text}</p>
-                                    <div className="space-y-2">
-                                        {q.quiz_options?.map((opt: any) => (
-                                            <div key={opt.id} className={cn("text-xs p-2 rounded border", opt.is_correct ? "border-emerald-500 bg-emerald-500/10 font-bold" : "border-border")}>
-                                                {opt.option_text}
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-destructive"
-                                        onClick={() => handleDeleteQuestion(q.id)}
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
+                </CardHeader>
+                <CardContent className="p-8 space-y-8">
+                    {isEditing ? (
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <Label className="uppercase font-black text-[10px] tracking-widest">Title</Label>
+                                    <Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="border-2 border-foreground" />
                                 </div>
-                            ))}
-                            {questions.length === 0 && <p className="text-xs text-muted-foreground italic text-center py-8">No questions added yet.</p>}
-                        </div>
-
-                        {/* Add Question Form */}
-                        <div className="p-6 border-2 border-dashed rounded-2xl bg-muted/5 space-y-4">
-                            <h5 className="text-xs font-black uppercase tracking-widest">Add New MCQ</h5>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="uppercase font-black text-[10px] tracking-widest">Max Marks</Label>
+                                        <Input type="number" value={form.max_marks} onChange={e => setForm({ ...form, max_marks: e.target.value })} className="border-2 border-foreground" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="uppercase font-black text-[10px] tracking-widest">Pass Marks</Label>
+                                        <Input type="number" value={form.passing_marks} onChange={e => setForm({ ...form, passing_marks: e.target.value })} className="border-2 border-foreground" />
+                                    </div>
+                                </div>
+                            </div>
                             <div className="space-y-2">
-                                <Label className="text-[10px] uppercase font-bold">Question Text</Label>
+                                <Label className="uppercase font-black text-[10px] tracking-widest">Description</Label>
+                                <Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="border-2 border-foreground min-h-[100px]" />
+                            </div>
+                            <div className="flex gap-2">
+                                <Button onClick={handleUpdate} className="flex-1 font-black">SAVE CONFIGURATION</Button>
+                                <Button variant="outline" onClick={() => setIsEditing(false)} className="border-2 border-foreground font-black">CANCEL</Button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
+                            {/* Project Section */}
+                            <div className="md:col-span-12 space-y-6">
+                                <div className="p-6 border-4 border-foreground bg-muted/5 flex flex-col md:flex-row items-center justify-between gap-6">
+                                    <div className="flex items-center gap-4">
+                                        <div className="h-14 w-14 bg-foreground text-background flex items-center justify-center shrink-0">
+                                            <FileText className="w-8 h-8" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase text-primary tracking-widest mb-1">Project Assignment</p>
+                                            <h4 className="font-black text-xl uppercase tracking-tighter">Instructional Briefing Sheet</h4>
+                                            <p className="text-[10px] font-bold opacity-60 uppercase">{assignment.file_url ? 'Active Document Linked' : 'No instruction file uploaded'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        {assignment.file_url && (
+                                            <a href={assignment.file_url} target="_blank" rel="noopener noreferrer">
+                                                <Button size="icon" variant="outline" className="h-12 w-12 border-2 border-foreground hover:bg-muted">
+                                                    <ExternalLink className="w-5 h-5" />
+                                                </Button>
+                                            </a>
+                                        )}
+                                        <input type="file" id="exam-ref-upload" className="hidden" onChange={e => e.target.files?.[0] && handleRefFileUpload(e.target.files[0])} />
+                                        <Button
+                                            disabled={uploadingRef}
+                                            onClick={() => document.getElementById('exam-ref-upload')?.click()}
+                                            className="h-12 px-6 border-4 border-foreground bg-foreground text-background font-black uppercase tracking-widest shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
+                                        >
+                                            {uploadingRef ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Upload className="mr-2 h-4 w-4" />}
+                                            {assignment.file_url ? "REPLACE BRIEF" : "UPLOAD BRIEF"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Stats */}
+                            <div className="md:col-span-12 grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="p-4 border-2 border-foreground bg-muted/20">
+                                    <p className="text-[9px] font-black uppercase opacity-50">Exam Weight</p>
+                                    <p className="text-xl font-black">{assignment.max_marks} PTS</p>
+                                </div>
+                                <div className="p-4 border-2 border-foreground bg-muted/20">
+                                    <p className="text-[9px] font-black uppercase opacity-50">Pass Threshold</p>
+                                    <p className="text-xl font-black text-emerald-600">{assignment.passing_marks} PTS</p>
+                                </div>
+                                <div className="p-4 border-2 border-foreground bg-muted/20">
+                                    <p className="text-[9px] font-black uppercase opacity-50">MCQ Bank</p>
+                                    <p className="text-xl font-black">{questions.length} Qs</p>
+                                </div>
+                                <div className="p-4 border-2 border-foreground bg-muted/20 flex items-center justify-between">
+                                    <div>
+                                        <p className="text-[9px] font-black uppercase opacity-50">Submissions</p>
+                                        <p className="text-xl font-black">{submissions.length || '0'}</p>
+                                    </div>
+                                    <Button variant="ghost" size="sm" onClick={loadSubmissions} className="font-black text-[9px] uppercase hover:bg-foreground hover:text-background">View</Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* MCQ Paper Creator Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                <Card className="border-4 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,0.05)]">
+                    <CardHeader className="bg-foreground text-background p-6">
+                        <div className="flex items-center gap-3 uppercase font-black tracking-tighter text-lg">
+                            <BookOpen className="w-5 h-5" />
+                            Final Exam Paper Builder
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-6 space-y-6">
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Question Specification</Label>
                                 <Input
-                                    placeholder="e.g. What is the melting point of..."
+                                    placeholder="Enter question text..."
                                     value={qForm.text}
                                     onChange={e => setQForm({ ...qForm, text: e.target.value })}
+                                    className="border-2 border-foreground font-bold h-12"
                                 />
                             </div>
                             <div className="space-y-3">
-                                <Label className="text-[10px] uppercase font-bold">Options (Check the correct one)</Label>
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Response Options (check the correct identifier)</Label>
                                 {qForm.options.map((opt, i) => (
-                                    <div key={i} className="flex gap-2 items-center">
-                                        <input
-                                            type="radio"
-                                            name="correct-opt"
-                                            checked={opt.is_correct}
-                                            onChange={() => {
+                                    <div key={i} className="flex gap-3 items-center">
+                                        <div
+                                            onClick={() => {
                                                 const next = [...qForm.options];
                                                 next.forEach((o, idx) => o.is_correct = idx === i);
                                                 setQForm({ ...qForm, options: next });
                                             }}
-                                        />
+                                            className={cn(
+                                                "h-10 w-10 border-4 border-foreground flex items-center justify-center cursor-pointer transition-colors shrink-0 font-black",
+                                                opt.is_correct ? "bg-primary text-primary-foreground" : "bg-muted"
+                                            )}
+                                        >
+                                            {String.fromCharCode(65 + i)}
+                                        </div>
                                         <Input
-                                            placeholder={`Option ${i + 1}`}
-                                            className="h-8 text-xs"
-                                            value={opt.option_text}
+                                            placeholder={`Response Option ${i + 1}`}
+                                            value={opt.option_text || ""}
                                             onChange={e => {
                                                 const next = [...qForm.options];
                                                 next[i].option_text = e.target.value;
                                                 setQForm({ ...qForm, options: next });
                                             }}
+                                            className="border-2 border-foreground h-10 font-medium"
                                         />
                                     </div>
                                 ))}
                             </div>
-                            <Button className="w-full font-bold uppercase gap-2" size="sm" onClick={handleAddQuestion}>
-                                <Plus className="w-4 h-4" /> Save Question
+                            <Button onClick={handleAddQuestion} disabled={!qForm.text} className="w-full h-12 bg-foreground text-background font-black uppercase tracking-widest group">
+                                <Plus className="mr-2 group-hover:rotate-180 transition-transform" /> APPEND TO EXAM BANK
                             </Button>
                         </div>
+                    </CardContent>
+                </Card>
+
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-black uppercase tracking-tighter italic flex items-center gap-2">
+                            <Activity className="w-5 h-5 text-primary" /> Active Question Bank
+                        </h3>
+                        <span className="bg-foreground text-background px-3 py-1 text-[10px] font-black uppercase">{questions.length} Items</span>
+                    </div>
+
+                    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                        {questions.map((q, idx) => (
+                            <div key={q.id} className="p-6 border-4 border-foreground bg-card relative group hover:translate-x-1 hover:translate-y-1 transition-all">
+                                <div className="flex items-center justify-between mb-4">
+                                    <span className="text-[10px] font-black uppercase bg-muted px-2 py-0.5 border-2 border-foreground">Q#{idx + 1}</span>
+                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteQuestion(q.id)} className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                                <p className="font-black text-lg mb-6 leading-tight uppercase tracking-tight">{q.question_text}</p>
+                                <div className="grid grid-cols-1 gap-2">
+                                    {q.quiz_options?.map((opt: any) => (
+                                        <div key={opt.id} className={cn(
+                                            "p-3 text-xs font-bold uppercase tracking-wider border-2 border-foreground flex items-center justify-between",
+                                            opt.is_correct ? "bg-primary text-primary-foreground border-primary" : "bg-muted/30 opacity-60"
+                                        )}>
+                                            {opt.option_text}
+                                            {opt.is_correct && <Check className="w-3 h-3" />}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                        {questions.length === 0 && (
+                            <div className="p-10 border-4 border-dashed border-muted text-center space-y-3 opacity-30">
+                                <AlertCircle className="w-10 h-10 mx-auto" />
+                                <p className="text-[10px] font-black uppercase tracking-[0.3em]">Question bank is empty</p>
+                            </div>
+                        )}
                     </div>
                 </div>
+            </div>
 
-                <div className="border-t pt-8">
-                    <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-black uppercase text-sm">Student Exam Submissions</h4>
-                        <Button variant="outline" size="sm" onClick={() => showSubmissions ? setShowSubmissions(false) : loadSubmissions()}>
-                            {showSubmissions ? "Hide" : "View Submissions"}
-                        </Button>
-                    </div>
-
-                    {showSubmissions && (
-                        <div className="space-y-3">
+            {/* Submissions Section */}
+            {showSubmissions && (
+                <Card className="border-4 border-foreground shadow-[16px_16px_0px_0px_rgba(0,0,0,1)]">
+                    <CardHeader className="bg-foreground text-background p-6">
+                        <CardTitle className="text-xl font-black uppercase tracking-wider">Candidate Submissions</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                        <div className="space-y-4">
                             {submissions.map(sub => (
-                                <div key={sub.id} className="border p-3 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card hover:bg-muted/5 transition-colors">
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-bold uppercase text-muted-foreground">User ID: {sub.user_id.slice(0, 8)}...</p>
-                                        <div className="flex items-center gap-2">
-                                            <a href={sub.file_url} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-primary flex items-center gap-1 hover:underline">
-                                                View Answer Sheet <ExternalLink className="w-3 h-3" />
-                                            </a>
-                                            <span className="text-xs text-muted-foreground">{new Date(sub.submitted_at).toLocaleDateString()}</span>
+                                <div key={sub.id} className="p-6 border-4 border-foreground bg-muted/5 flex flex-col md:flex-row items-center justify-between gap-6">
+                                    <div className="flex items-center gap-4">
+                                        <div className="h-12 w-12 bg-foreground text-background flex items-center justify-center font-black">
+                                            {sub.user_id.slice(0, 2).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <p className="font-black text-sm uppercase tracking-tighter">Candidate {sub.user_id.slice(0, 6)}</p>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">{new Date(sub.submitted_at).toLocaleDateString()} @ {new Date(sub.submitted_at).toLocaleTimeString()}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        {sub.marks_awarded !== null ? (
-                                            <div className="text-right">
-                                                <span className={sub.marks_awarded >= assignment.passing_marks ? "text-green-600 font-black" : "text-destructive font-bold"}>
-                                                    {sub.marks_awarded} / {assignment.max_marks}
-                                                </span>
-                                                <p className="text-[10px] font-bold uppercase">{sub.marks_awarded >= assignment.passing_marks ? "Passed" : "Failed"}</p>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-2">
-                                                <Input
-                                                    type="number"
-                                                    placeholder="Marks"
-                                                    className="w-20 h-8 text-right font-mono"
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') handleEvaluate(sub.id, Number(e.currentTarget.value))
-                                                    }}
-                                                    onBlur={(e) => {
-                                                        if (e.target.value) handleEvaluate(sub.id, Number(e.target.value))
-                                                    }}
-                                                />
-                                                <Button size="sm" variant="ghost" className="h-8">Save</Button>
-                                            </div>
-                                        )}
+                                    <div className="flex items-center gap-6">
+                                        <a href={sub.file_url} target="_blank" rel="noopener noreferrer">
+                                            <Button variant="outline" className="border-2 border-foreground font-black uppercase text-[10px] tracking-widest gap-2">
+                                                <ExternalLink className="w-3 h-3" /> View Answer Sheet
+                                            </Button>
+                                        </a>
+
+                                        <div className="flex items-center gap-2">
+                                            {sub.marks_awarded !== null ? (
+                                                <div className="text-right px-4 border-l-2 border-foreground/10">
+                                                    <span className={cn("text-2xl font-black", sub.marks_awarded >= assignment.passing_marks ? "text-emerald-500" : "text-destructive")}>
+                                                        {sub.marks_awarded} / {assignment.max_marks}
+                                                    </span>
+                                                    <p className="text-[9px] font-black uppercase tracking-widest opacity-60">
+                                                        {sub.marks_awarded >= assignment.passing_marks ? 'QUALIFIED' : 'DISQUALIFIED'}
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <div className="flex gap-2">
+                                                    <Input
+                                                        type="number"
+                                                        placeholder="Score"
+                                                        className="w-24 border-2 border-foreground text-center font-black"
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') handleEvaluate(sub.id, Number(e.currentTarget.value))
+                                                        }}
+                                                    />
+                                                    <Button onClick={(e) => {
+                                                        const val = (e.currentTarget.previousElementSibling as HTMLInputElement).value;
+                                                        if (val) handleEvaluate(sub.id, Number(val));
+                                                    }} className="font-bold bg-primary uppercase text-xs">Commit</Button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             ))}
-                            {submissions.length === 0 && <p className="text-sm text-muted-foreground italic">No submissions found.</p>}
+                            {submissions.length === 0 && <p className="py-12 text-center text-[10px] font-black uppercase opacity-40">No work submitted yet.</p>}
                         </div>
-                    )}
-                </div>
-            </CardContent>
-        </Card>
+                    </CardContent>
+                </Card>
+            )}
+
+            <Button variant="ghost" className="w-full text-destructive hover:bg-destructive/5 text-[10px] font-black uppercase py-8 opacity-20 hover:opacity-100" onClick={() => navigate('/admin/courses')}>
+                Exit Content Manager
+            </Button>
+        </div>
     );
 }

@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, Upload, Video as VideoIcon, Check } from 'lucide-react'
-import { updateVideo, uploadVideo } from '@/api/videos'
+import { Loader2, Upload, Video as VideoIcon, Plus, Trash2, ExternalLink } from 'lucide-react'
+import { updateVideo, uploadVideo, createVideo } from '@/api/videos'
 import { Textarea } from '@/components/ui/textarea'
 
 interface TopicEditDialogProps {
@@ -17,6 +17,7 @@ interface TopicEditDialogProps {
     videoUrl?: string | null
     video_url?: string | null
     description?: string | null
+    videos?: any[]
   } | null
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -33,16 +34,43 @@ export function TopicEditDialog({
   const [uploading, setUploading] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [videoUrl, setVideoUrl] = useState('')
+
+  // Multiple videos management
+  const [videos, setVideos] = useState<any[]>([])
+  const [newVideoUrl, setNewVideoUrl] = useState('')
+  const [newVideoTitle, setNewVideoTitle] = useState('')
+
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (topic) {
       setTitle(topic.title || '')
       setDescription(topic.description || '')
-      setVideoUrl(topic.videoUrl || topic.video_url || '')
+      setVideos(topic.videos || [])
     }
   }, [topic])
+
+  async function handleAddVideoUrl() {
+    if (!topic || !newVideoUrl.trim()) return
+    setLoading(true)
+    try {
+      await createVideo({
+        title: newVideoTitle.trim() || `${topic.title} - Case Study`,
+        url: newVideoUrl.trim(),
+        courseId: (topic as any).course_id || (topic as any).courseId || '',
+        topicId: topic.id
+      })
+      alert('ASSET INTEGRATED: New video resource linked to topic.')
+      setNewVideoUrl('')
+      setNewVideoTitle('')
+      onSuccess() // Reload parent
+    } catch (err) {
+      console.error(err)
+      alert('ERROR: Failed to link video resource.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -51,12 +79,15 @@ export function TopicEditDialog({
     setUploading(true)
     try {
       const formData = new FormData()
-      formData.append('video', file)
+      formData.append('file', file)
       formData.append('topicId', topic.id)
+      formData.append('courseId', (topic as any).course_id || (topic as any).courseId || '')
+      formData.append('title', newVideoTitle.trim() || `${topic.title} - Material`)
 
-      const res = await uploadVideo(formData)
-      setVideoUrl(res.data.url)
+      await uploadVideo(formData)
       alert('MEDIA ASSET STORED: Video has been uploaded and linked.')
+      setNewVideoTitle('')
+      onSuccess() // Reload parent
     } catch (err: any) {
       console.error('Upload failed:', err)
       alert('UPLOAD SYSTEM ERROR: Could not commit file to storage.')
@@ -80,7 +111,6 @@ export function TopicEditDialog({
       await updateVideo(topic.id, {
         title: title.trim(),
         description: description.trim(),
-        url: videoUrl.trim() || undefined,
       })
 
       onSuccess()
@@ -97,122 +127,140 @@ export function TopicEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} key={topic.id}>
-      <DialogContent className="sm:max-w-[700px] border-4 border-foreground shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] bg-background p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-[800px] border-4 border-foreground shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] bg-background p-0 overflow-hidden">
         <DialogHeader className="bg-foreground text-background p-6">
-          <DialogTitle className="text-2xl font-black uppercase tracking-tighter italic">Edit Curriculum Item</DialogTitle>
+          <DialogTitle className="text-2xl font-black uppercase tracking-tighter italic">Topic Configuration</DialogTitle>
           <div className="flex items-center gap-2 mt-1">
-            <span className="bg-primary-foreground text-primary text-[8px] font-black px-1.5 py-0.5 rounded">UUID: {topic.id.slice(0, 8)}...</span>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70">Technical content configuration</p>
+            <span className="bg-primary-foreground text-primary text-[8px] font-black px-1.5 py-0.5 rounded">ID: {topic.id}</span>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70">Curriculum Item Settings</p>
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
-          {/* General Metadata */}
+        <form onSubmit={handleSubmit} className="p-8 space-y-8 max-h-[75vh] overflow-y-auto custom-scrollbar">
+          {/* Metadata Block */}
           <div className="space-y-6">
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">General Metadata (Identity)</Label>
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <Label className="text-[9px] font-bold uppercase opacity-50">Title</Label>
-                  <Input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    required
-                    className="h-12 text-lg font-bold border-4 border-foreground focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:bg-muted/30 transition-all"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[9px] font-bold uppercase opacity-50">Abstract / Description</Label>
-                  <Textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Provide a technical summary of this curriculum module..."
-                    className="min-h-[100px] border-4 border-foreground font-medium focus-visible:ring-0 focus-visible:ring-offset-0 transition-all rounded-none"
-                  />
-                </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Topic Identity</Label>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                  placeholder="e.g. Fundamental Mechanics"
+                  className="h-12 text-lg font-bold border-4 border-foreground focus-visible:ring-0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Technical Abstract</Label>
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Describe the learning outcomes..."
+                  className="min-h-[80px] border-2 border-foreground font-medium rounded-none"
+                />
               </div>
             </div>
           </div>
 
-          {/* Media Subsystem */}
-          <div className="space-y-4 p-6 border-4 border-foreground bg-muted/5 rounded-none relative">
-            <div className="absolute -top-3 left-4 bg-foreground text-background px-2 py-0.5 text-[8px] font-black uppercase tracking-widest">
-              Media Subsystem [VIDEO_01]
+          {/* Videos Block */}
+          <div className="space-y-6 pt-6 border-t-4 border-dashed border-border">
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-primary">Media Library (Multiple Videos Support)</Label>
             </div>
 
-            <div className="space-y-4 pt-2">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                  <VideoIcon className="h-4 w-4" /> Endpoint URL
-                </Label>
-                <Input
-                  placeholder="https://content.riidl.io/industrial-v1.mp4"
-                  value={videoUrl}
-                  onChange={(e) => setVideoUrl(e.target.value)}
-                  className="h-12 border-2 border-foreground font-mono text-xs"
-                />
-              </div>
-
-              <div className="relative py-2">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t-2 border-foreground/20" />
-                </div>
-                <div className="relative flex justify-center text-[8px] font-black uppercase tracking-widest">
-                  <span className="bg-muted px-2 text-muted-foreground">Local Interface</span>
-                </div>
-              </div>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="video/*"
-                hidden
-                onChange={handleFileUpload}
-              />
-
-              <Button
-                type="button"
-                variant="outline"
-                disabled={uploading}
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full h-12 border-2 border-foreground font-black uppercase tracking-widest text-[10px] hover:bg-foreground hover:text-background transition-all"
-              >
-                {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                {uploading ? 'Transferring Logic...' : 'Select Local Media Source'}
-              </Button>
-
-              {videoUrl ? (
-                <div className="flex items-center gap-2 text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-500/10 p-3 border-2 border-emerald-500/30">
-                  <Check className="h-4 w-4" /> ASSET_LINK_STABLE: {videoUrl.split('/').pop()?.slice(0, 30)}...
-                </div>
-              ) : uploading ? (
-                <div className="text-[10px] font-black text-primary uppercase tracking-widest animate-pulse p-2 border-2 border-dashed border-primary/20 text-center">
-                  Committing media data to storage cluster...
-                </div>
+            {/* Current Videos List */}
+            <div className="space-y-3">
+              {videos.length > 0 ? (
+                videos.map((v, i) => (
+                  <div key={v.id || i} className="flex items-center gap-4 p-4 border-2 border-foreground bg-muted/5 group">
+                    <div className="h-10 w-10 flex items-center justify-center bg-foreground text-background text-xs font-black">
+                      {i + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-black uppercase truncate">{v.title || 'Untitled Video'}</p>
+                      <p className="text-[9px] font-bold text-muted-foreground truncate font-mono uppercase opacity-60 tracking-tighter">{v.url || v.video_path}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <a href={v.url || v.video_path} target="_blank" rel="noopener noreferrer">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/10">
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </a>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
               ) : (
-                <div className="text-[10px] font-black text-destructive uppercase tracking-widest opacity-50 text-center p-2 border-2 border-dashed border-destructive/10">
-                  No source linked [NULL_REF]
+                <div className="py-8 border-2 border-dashed border-border text-center text-[10px] font-black uppercase text-muted-foreground">
+                  No video assets attached to this topic
                 </div>
               )}
             </div>
+
+            {/* Add Video Form */}
+            <div className="p-6 border-4 border-foreground bg-muted/10 space-y-4">
+              <h5 className="text-[10px] font-black uppercase tracking-widest text-foreground flex items-center gap-2">
+                <Plus className="h-3 w-3" /> Append New Media Resource
+              </h5>
+
+              <div className="space-y-3">
+                <Input
+                  placeholder="Asset Title (e.g. Part 2: Implementation)"
+                  value={newVideoTitle}
+                  onChange={e => setNewVideoTitle(e.target.value)}
+                  className="h-9 border-2 font-bold text-xs"
+                />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-[9px] font-black uppercase opacity-60">URL Direct Link</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="https://..."
+                        value={newVideoUrl}
+                        onChange={e => setNewVideoUrl(e.target.value)}
+                        className="h-9 border-2 text-xs font-mono"
+                      />
+                      <Button size="sm" onClick={handleAddVideoUrl} disabled={loading || !newVideoUrl} className="font-black">APPLY</Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-[9px] font-black uppercase opacity-60">Upload Local File</Label>
+                    <input ref={fileInputRef} type="file" accept="video/*" hidden onChange={handleFileUpload} />
+                    <Button
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="w-full h-9 border-2 border-foreground font-black text-[10px] uppercase"
+                    >
+                      {uploading ? <Loader2 className="animate-spin h-3 w-3 mr-2" /> : <Upload className="h-3 w-3 mr-2" />}
+                      {uploading ? 'Processing...' : 'Upload Asset'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <DialogFooter className="pt-2 gap-3">
+          <DialogFooter className="pt-4 gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              className="h-14 flex-1 border-4 border-foreground font-black uppercase tracking-widest text-xs hover:bg-muted"
+              className="h-14 flex-1 border-4 border-foreground font-black uppercase tracking-widest text-xs"
             >
-              Abort
+              Cancel
             </Button>
             <Button
               type="submit"
               disabled={loading || uploading}
-              className="h-14 flex-[2] bg-foreground text-background font-black uppercase tracking-widest text-xs hover:bg-muted hover:text-foreground border-4 border-foreground transition-all shadow-[6px_6px_0px_0px_rgba(0,0,0,0.2)] active:shadow-none active:translate-x-1 active:translate-y-1"
+              className="h-14 flex-[2] bg-foreground text-background font-black uppercase tracking-widest text-xs hover:bg-muted hover:text-foreground border-4 border-foreground transition-all shadow-[6px_6px_0px_0px_rgba(0,0,0,0.2)]"
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Commit Technical Changes
+              Save Topic Changes
             </Button>
           </DialogFooter>
         </form>

@@ -16,5 +16,8 @@ export const deleteQuestion = (id: string) =>
 export const getQuizByTopic = (topicId: string) =>
   api.get(`/quiz/topic/${topicId}`);
 
+export const getFinalExamByCourse = (courseId: string) =>
+  api.get("/quiz", { params: { courseId, is_final_exam: true } });
+
 export const submitQuiz = (data: { topic_id?: string; course_id?: string; answers: any[] }) =>
   api.post("/quiz/submit", data);
