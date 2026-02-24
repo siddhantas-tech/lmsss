@@ -1,68 +1,13 @@
-import { TrendingUp, Activity, Wifi, WifiOff } from "lucide-react";
+import { TrendingUp, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { useState } from "react";
-import { testAPIConnection } from "@/utils/api-test";
 
 export default function AdminDashboardPage() {
-    const [apiStatus, setApiStatus] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
-    const [testing, setTesting] = useState(false);
-
-    const handleTestAPI = async () => {
-        setTesting(true);
-        try {
-            const success = await testAPIConnection();
-            setApiStatus(success ? 'connected' : 'disconnected');
-        } catch (error) {
-            setApiStatus('disconnected');
-        } finally {
-            setTesting(false);
-        }
-    };
-
     return (
         <main className="w-full max-w-7xl mx-auto px-8 py-8">
             {/* Dashboard Header */}
             <div className="flex flex-col gap-1 mb-8">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-black tracking-tighter uppercase leading-none">Dashboard</h1>
-                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-[0.2em] opacity-70">System Overview & Metrics</p>
-                    </div>
-                    <Button
-                        onClick={handleTestAPI}
-                        disabled={testing}
-                        variant="outline"
-                        className="flex items-center gap-2 border-2"
-                    >
-                        {testing ? (
-                            <>
-                                <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                                Testing...
-                            </>
-                        ) : (
-                            <>
-                                {apiStatus === 'connected' ? (
-                                    <Wifi className="h-4 w-4 text-green-600" />
-                                ) : apiStatus === 'disconnected' ? (
-                                    <WifiOff className="h-4 w-4 text-red-600" />
-                                ) : (
-                                    <Wifi className="h-4 w-4" />
-                                )}
-                                Test API
-                            </>
-                        )}
-                    </Button>
-                </div>
-                {apiStatus !== 'unknown' && (
-                    <div className={`text-xs font-bold px-3 py-1 rounded-full ${
-                        apiStatus === 'connected' 
-                            ? 'bg-green-100 text-green-800 border border-green-200' 
-                            : 'bg-red-100 text-red-800 border border-red-200'
-                    }`}>
-                        API Status: {apiStatus === 'connected' ? 'Connected' : 'Disconnected'}
-                    </div>
-                )}
+                <h1 className="text-2xl font-black tracking-tighter uppercase leading-none">Dashboard</h1>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-[0.2em] opacity-70">System Overview & Metrics</p>
             </div>
 
             {/* Core Metrics Grid */}

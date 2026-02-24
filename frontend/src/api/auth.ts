@@ -16,13 +16,3 @@ export const generateAndStoreDevToken = async (role: 'admin' | 'client' = 'admin
   }
 };
 
-export const ensureDevToken = async () => {
-  const existingToken = localStorage.getItem('token');
-  if (existingToken) {
-    return existingToken;
-  }
-  
-  // Generate new admin token if none exists
-  return await generateAndStoreDevToken('admin');
-};
-
