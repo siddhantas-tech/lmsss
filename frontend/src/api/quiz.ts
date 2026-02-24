@@ -1,24 +1,24 @@
 import api from "./axios";
 
 // Admin quiz endpoints
-export const getQuestions = (params: { course_id?: string; topic_id?: string; is_final_exam?: boolean }) =>
-  api.get("/api/quiz", { params });
+export const getQuestions = (params: { courseId?: string; topicId?: string }) =>
+  api.get("/api/admin/quiz", { params });
 
 export const createQuestion = (data: any) =>
-  api.post("/api/quiz", data);
+  api.post("/api/admin/quiz", data);
 
 export const updateQuestion = (id: string, data: any) =>
-  api.put(`/api/quiz/${id}`, data);
+  api.put(`/api/admin/quiz/${id}`, data);
 
 export const deleteQuestion = (id: string) =>
-  api.delete(`/api/quiz/${id}`);
+  api.delete(`/api/admin/quiz/${id}`);
 
 // User side
-export const getQuizByTopic = (topic_id: string) =>
-  api.get(`/api/quiz/topic/${topic_id}`);
+export const getQuizByTopic = (topicId: string) =>
+  api.get(`/api/quiz/topic/${topicId}`);
 
-export const getFinalExamByCourse = (course_id: string) =>
-  api.get("/api/quiz", { params: { course_id, is_final_exam: true } });
+export const getFinalExamByCourse = (courseId: string) =>
+  api.get("/api/admin/quiz", { params: { courseId } });
 
-export const submitQuiz = (data: { topic_id?: string; course_id?: string; is_final_exam?: boolean; time_taken?: number; question_id?: string; selected_option_id?: string }) =>
+export const submitQuiz = (data: { topicId: string; courseId: string; isFinalExam: boolean; timeTaken: number; answers: { questionId: string; selectedOptionId: string }[] }) =>
   api.post("/api/quiz/submit", data);

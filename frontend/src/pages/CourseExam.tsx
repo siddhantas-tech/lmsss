@@ -84,20 +84,20 @@ export default function CourseExamPage() {
             if (Object.keys(answers).length > 0) {
                 console.log("Submitting exam answers:", answers);
                 
-                // Submit each answer individually as per API spec
-                for (const [questionId, selectedOptionId] of Object.entries(answers)) {
-                    const submissionData = {
-                        course_id: courseId,
-                        is_final_exam: true,
-                        time_taken: elapsed,
-                        question_id: questionId,
-                        selected_option_id: selectedOptionId
-                    };
-                    
-                    console.log("Submitting answer:", submissionData);
-                    await submitQuiz(submissionData);
-                }
+                // Submit exam answers as per API spec
+                const submissionData = {
+                    topicId: '', // Final exam doesn't need topicId
+                    courseId: courseId || '',
+                    isFinalExam: true,
+                    timeTaken: elapsed,
+                    answers: Object.entries(answers).map(([questionId, selectedOptionId]) => ({
+                        questionId: questionId,
+                        selectedOptionId: selectedOptionId
+                    }))
+                };
                 
+                console.log("Exam submission data:", submissionData);
+                await submitQuiz(submissionData);
                 console.log("Exam submitted successfully");
             }
             setSubmitted(true);
