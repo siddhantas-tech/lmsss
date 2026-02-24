@@ -120,7 +120,7 @@ export default function EditCoursePage() {
           };
         }));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to load course data:", error);
     }
   };
@@ -128,16 +128,11 @@ export default function EditCoursePage() {
   /* ------------------ topic handlers ------------------ */
   const handleAddTopic = async () => {
     try {
-      console.log("Adding topic to course:", id);
-      console.log("Current topics count:", topics.length);
-      
       const res = await createTopic({
         title: "New Topic",
         courseId: id!,
         orderIndex: topics.length,
       });
-
-      console.log("Create topic response:", res);
 
       const data = res.data;
       const foundTopic = (data?.topic || data?.data || data);
@@ -159,7 +154,6 @@ export default function EditCoursePage() {
         showVideoSection: false
       };
 
-      console.log("New topic created:", newTopic);
       setTopics([...topics, newTopic]);
     } catch (e: any) {
       console.error("Failed to create topic:", e);
@@ -260,25 +254,14 @@ export default function EditCoursePage() {
                     ))}
                   </SelectContent>
                 </Select>
-                {/* Debug: Show selected category */}
-                <div className="text-xs text-gray-500 mt-1">
-                  Selected: {course.categoryId} | Available: {categories.length} categories
-                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Course Title</label>
-                <Input
-                  value={course.title}
-                  onChange={(e) =>
-                    setCourse({ ...course, title: e.target.value })
-                  }
-                  placeholder="Course title"
-                />
-                {/* Debug: Show title value */}
-                <div className="text-xs text-gray-500 mt-1">
-                  Title value: "{course.title}"
-                </div>
-              </div>
+              <Input
+                value={course.title}
+                onChange={(e) =>
+                  setCourse({ ...course, title: e.target.value })
+                }
+                placeholder="Course title"
+              />
               <Textarea
                 value={course.description}
                 onChange={(e) =>
