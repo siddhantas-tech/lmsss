@@ -260,14 +260,25 @@ export default function EditCoursePage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {/* Debug: Show selected category */}
+                <div className="text-xs text-gray-500 mt-1">
+                  Selected: {course.categoryId} | Available: {categories.length} categories
+                </div>
               </div>
-              <Input
-                value={course.title}
-                onChange={(e) =>
-                  setCourse({ ...course, title: e.target.value })
-                }
-                placeholder="Course title"
-              />
+              <div>
+                <label className="text-sm font-medium mb-2 block">Course Title</label>
+                <Input
+                  value={course.title}
+                  onChange={(e) =>
+                    setCourse({ ...course, title: e.target.value })
+                  }
+                  placeholder="Course title"
+                />
+                {/* Debug: Show title value */}
+                <div className="text-xs text-gray-500 mt-1">
+                  Title value: "{course.title}"
+                </div>
+              </div>
               <Textarea
                 value={course.description}
                 onChange={(e) =>
