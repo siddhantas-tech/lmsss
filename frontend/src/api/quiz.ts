@@ -20,5 +20,5 @@ export const getQuizByTopic = (topic_id: string) =>
 export const getFinalExamByCourse = (course_id: string) =>
   api.get("/admin/quiz", { params: { course_id, is_final_exam: true } });
 
-export const submitQuiz = (data: { topicId?: string; courseId?: string; isFinalExam?: boolean; timeTaken?: number; answers: any[] }) =>
+export const submitQuiz = (data: { topic_id?: string; course_id?: string; is_final_exam?: boolean; time_taken?: number; question_id?: string; selected_option_id?: string }) =>
   api.post("/quiz/submit", data);
