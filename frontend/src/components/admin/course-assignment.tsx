@@ -64,7 +64,9 @@ function AssignmentSection({ courseId }: { courseId: string }) {
                 max_marks: 100,
                 passing_marks: 40,
             });
-            setAssignment(res.data);
+            const data = res.data;
+            const foundAssignment = (data?.assignment || data?.assignments?.[0] || data?.data || data);
+            setAssignment(foundAssignment && typeof foundAssignment === 'object' ? foundAssignment : null);
             toast({ title: "Created", description: "Assignment created. Now upload an instruction file." });
         } catch (e: any) {
             toast({ variant: "destructive", title: "Error", description: e?.response?.data?.message || "Failed to create assignment." });
@@ -89,8 +91,10 @@ function AssignmentSection({ courseId }: { courseId: string }) {
                     max_marks: 100,
                     passing_marks: 40,
                 });
-                targetAssignment = res.data;
-                setAssignment(res.data);
+                const data = res.data;
+                const created = (data?.assignment || data?.assignments?.[0] || data?.data || data);
+                targetAssignment = created;
+                setAssignment(created);
             } catch (e: any) {
                 toast({ variant: "destructive", title: "Error", description: "Failed to create assignment before upload." });
                 setUploading(false);
@@ -307,7 +311,9 @@ function QuizBuilderSection({ courseId }: { courseId: string }) {
                     })),
             };
             const res = await createQuestion(payload);
-            setQuestions(prev => [...prev, res.data]);
+            const data = res.data;
+            const foundQ = (data?.question || data?.quiz || data?.data || data);
+            setQuestions(prev => [...prev, foundQ]);
             setForm(emptyForm());
             toast({ title: "Added", description: "Question added to exam." });
         } catch (e: any) {

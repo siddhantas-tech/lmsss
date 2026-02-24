@@ -135,11 +135,18 @@ export default function EditCoursePage() {
         order_index: topics.length,
       });
 
+      const data = res.data;
+      const foundTopic = (data?.topic || data?.data || data);
+
+      if (!foundTopic || typeof foundTopic !== 'object') {
+        throw new Error("Invalid response from server");
+      }
+
       const newTopic = {
-        ...res.data,
-        videoUrl: "",
-        videoId: undefined,
-        videos: [],
+        ...foundTopic,
+        videoUrl: foundTopic.video_url || foundTopic.videoUrl || "",
+        videoId: foundTopic.video_id || foundTopic.videoId,
+        videos: Array.isArray(foundTopic.videos) ? foundTopic.videos : [],
         showVideoSection: false
       };
 
