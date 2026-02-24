@@ -293,7 +293,7 @@ function QuizBuilderSection({ courseId }: { courseId: string }) {
     async function fetchQuestions() {
         setLoading(true);
         try {
-            const res = await getQuestions({ course_id: courseId, is_final_exam: true });
+            const res = await getQuestions({ courseId: courseId });
             const data = res.data;
             // Robust check for questions array
             const qList = Array.isArray(data) ? data : (data?.questions || data?.quiz || data?.data || []);
@@ -320,8 +320,11 @@ function QuizBuilderSection({ courseId }: { courseId: string }) {
         try {
             const payload = {
                 course_id: courseId,
-                is_final_exam: true,
+                topic_id: '', // Final exam doesn't need topic_id
                 question_text: form.question_text.trim(),
+                question_type: 'multiple_choice',
+                question_order: questions.length + 1,
+                is_final_exam: true,
                 options: form.options
                     .filter(o => o.trim())
                     .map((o, i) => ({
