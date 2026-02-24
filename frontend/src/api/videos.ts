@@ -10,11 +10,11 @@ export interface Video {
 
 // Create Video via URL record (Admin)
 export const createVideo = (data: { title: string; url: string; course_id: string; topic_id: string }) =>
-  api.post("/admin/video", data);
+  api.post("/api/video", data);
 
 // Upload Video File (Admin)
 export const uploadVideo = (formData: FormData) =>
-  api.post("/admin/video/upload", formData, {
+  api.post("/api/video/upload", formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -22,16 +22,16 @@ export const uploadVideo = (formData: FormData) =>
 
 // Stream Video URL generator (Public)
 export const getStreamUrl = (topicId: string) =>
-  `${api.defaults.baseURL}/video?topicId=${topicId}`;
+  `${api.defaults.baseURL}/api/video?topicId=${topicId}`;
 
 // Get Signed URL (Client)
 export const getSignedUrl = (topicId: string) =>
-  api.get("/video/signed-url", { params: { topicId } });
+  api.get("/api/video/signed-url", { params: { topicId } });
 
 // Update Video (Admin)
 export const updateVideo = (topicId: string, payload: { title?: string; url?: string; description?: string }) =>
-  api.put(`/admin/video/${topicId}`, payload);
+  api.put(`/api/video/${topicId}`, payload);
 
 // Delete Video (Admin)
 export const deleteVideo = (id: string) =>
-  api.delete(`/admin/video/${id}`);
+  api.delete(`/api/video/${id}`);

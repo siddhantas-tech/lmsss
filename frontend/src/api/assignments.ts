@@ -2,29 +2,29 @@ import api from "./axios";
 
 // Admin assignment endpoints
 export const createAssignment = (data: { topic_id: string; title: string; description: string; max_marks: number; passing_marks: number }) =>
-    api.post("/admin/assignments", data);
+    api.post("/api/assignments", data);
 
 export const updateAssignment = (assignmentId: string, data: any) =>
-    api.patch(`/admin/assignments/${assignmentId}`, data);
+    api.patch(`/api/assignments/${assignmentId}`, data);
 
 export const uploadAssignmentFile = (assignmentId: string, formData: FormData) =>
-    api.post(`/admin/assignments/${assignmentId}/upload`, formData, {
+    api.post(`/api/assignments/${assignmentId}/upload`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
     });
 
 export const getAssignmentByCourse = (courseId: string) =>
-    api.get(`/assignments/course/${courseId}`);
+    api.get(`/api/assignments/course/${courseId}`);
 
 export const submitAssignment = (assignmentId: string, formData: FormData) =>
-    api.post(`/assignments/${assignmentId}/submit`, formData, {
+    api.post(`/api/assignments/${assignmentId}/submit`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
     });
 
 export const getAssignmentSubmissions = (assignmentId: string) =>
-    api.get(`/admin/assignments/${assignmentId}/submissions`);
+    api.get(`/api/assignments/${assignmentId}/submissions`);
 
 export const evaluateSubmission = (submissionId: string, data: { marks_awarded: number }) =>
-    api.post(`/admin/assignments/submissions/${submissionId}/evaluate`, data);
+    api.post(`/api/assignments/submissions/${submissionId}/evaluate`, data);
 
 export const deleteAssignment = (assignmentId: string) =>
-    api.delete(`/admin/assignments/${assignmentId}`);
+    api.delete(`/api/assignments/${assignmentId}`);

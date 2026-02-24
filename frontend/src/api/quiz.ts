@@ -2,23 +2,23 @@ import api from "./axios";
 
 // Admin quiz endpoints
 export const getQuestions = (params: { course_id?: string; topic_id?: string; is_final_exam?: boolean }) =>
-  api.get("/admin/quiz", { params });
+  api.get("/api/quiz", { params });
 
 export const createQuestion = (data: any) =>
-  api.post("/admin/quiz", data);
+  api.post("/api/quiz", data);
 
 export const updateQuestion = (id: string, data: any) =>
-  api.put(`/admin/quiz/${id}`, data);
+  api.put(`/api/quiz/${id}`, data);
 
 export const deleteQuestion = (id: string) =>
-  api.delete(`/admin/quiz/${id}`);
+  api.delete(`/api/quiz/${id}`);
 
 // User side
 export const getQuizByTopic = (topic_id: string) =>
-  api.get(`/quiz/topic/${topic_id}`);
+  api.get(`/api/quiz/topic/${topic_id}`);
 
 export const getFinalExamByCourse = (course_id: string) =>
-  api.get("/admin/quiz", { params: { course_id, is_final_exam: true } });
+  api.get("/api/quiz", { params: { course_id, is_final_exam: true } });
 
 export const submitQuiz = (data: { topic_id?: string; course_id?: string; is_final_exam?: boolean; time_taken?: number; question_id?: string; selected_option_id?: string }) =>
-  api.post("/quiz/submit", data);
+  api.post("/api/quiz/submit", data);
