@@ -18,14 +18,6 @@ export default defineConfig({
         secure: false,
       }
     }
-  },
-  define: {
-    // For Vercel production, we'll use the deployed backend URL
-    __API_BASE_URL__: JSON.stringify(
-      process.env.NODE_ENV === 'production'
-        ? 'https://learning-management-system-be.onrender.com' // Your backend URL from vercel.json
-        : '/api'
-    )
   }
 });
 

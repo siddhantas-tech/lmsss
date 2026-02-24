@@ -1,10 +1,7 @@
 import axios from "axios";
 
-// Use Vercel proxy in development, direct backend URL in production
-const BASE_URL = typeof __API_BASE_URL__ !== 'undefined' ? __API_BASE_URL__ : "/api";
-
 const api = axios.create({
-  baseURL: BASE_URL,
+  baseURL: "/api",
 });
 
 // Attach JWT automatically
