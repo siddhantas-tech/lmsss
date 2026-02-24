@@ -8,8 +8,6 @@ import {
   Trash2,
   Check,
   ChevronsUpDown,
-  Loader2,
-  Upload,
   Settings,
 } from "lucide-react";
 
@@ -40,8 +38,7 @@ import { cn } from "@/lib/utils";
 import { getCategories } from "@/api/categories";
 import { getLabs, getLabsForCourse, assignLabToCourse } from "@/api/labs";
 import { getCourseDetails, updateCourse, createCourse } from "@/api/courses";
-import { createTopic, updateTopic, deleteTopic, getTopicsByCourse } from "@/api/topics";
-import { createVideo, updateVideo, uploadVideo } from "@/api/videos";
+import { createTopic, deleteTopic, getTopicsByCourse } from "@/api/topics";
 import { CourseAssignmentManager } from "@/components/admin/course-assignment";
 import { TopicEditDialog } from "@/components/admin/topic-edit-dialog";
 
@@ -134,8 +131,8 @@ export default function EditCoursePage() {
     try {
       const res = await createTopic({
         title: "New Topic",
-        courseId: id!,
-        orderIndex: topics.length,
+        course_id: id!,
+        order_index: topics.length,
       });
 
       const newTopic = {
@@ -163,70 +160,7 @@ export default function EditCoursePage() {
     }
   };
 
-  const updateTopicLocal = (id: string, patch: Record<string, any>) => {
-    setTopics(topics.map((t) => (t.id === id ? { ...t, ...patch } : t)));
-  };
 
-  const saveTopicTitle = async (topicId: string, title: string) => {
-    if (!title.trim()) return;
-    try {
-      await updateTopic(topicId, { title });
-    } catch (e: any) {
-      console.error("Failed to update topic title on server:", e);
-    }
-  };
-
-  const saveTopicVideoUrl = async (topicId: string, url: string) => {
-    if (!url) return;
-    updateTopicLocal(topicId, { uploading: true, uploadError: "" });
-    try {
-      const topic = topics.find(t => t.id === topicId);
-      if (topic?.videoId) {
-        await updateVideo(topic.id, { title: topic.title + " Video", url });
-      } else {
-        const { data: newVideo } = await createVideo({
-          title: topic?.title + " Video",
-          url,
-          courseId: id!,
-          topicId: topicId,
-        });
-        updateTopicLocal(topicId, { videoId: newVideo.id });
-      }
-      updateTopicLocal(topicId, { uploading: false, videoUrl: url });
-    } catch (e: any) {
-      updateTopicLocal(topicId, {
-        uploading: false,
-        uploadError: e?.response?.data?.message || e?.message || "Failed to save video URL.",
-      });
-    }
-  };
-
-  const handleVideoFileUpload = async (topicId: string, file: File) => {
-    if (!file) return;
-    updateTopicLocal(topicId, { uploading: true, uploadError: "" });
-    try {
-      const topic = topics.find(t => t.id === topicId);
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("topicId", topicId);
-      formData.append("courseId", id!);
-      formData.append("title", topic?.title || "Topic Video");
-
-      const { data: result } = await uploadVideo(formData);
-
-      updateTopicLocal(topicId, {
-        uploading: false,
-        videoUrl: result.url,
-        videoId: result.id
-      });
-    } catch (e: any) {
-      console.error("Upload failed:", e);
-      updateTopicLocal(topicId, {
-        uploading: false,
-        uploadError: e?.response?.data?.message || e?.message || "Failed to upload video.",
-      });
-    }
-  };
 
   const toggleLab = (labId: string) => {
     setSelectedLabs((prev) =>
@@ -334,36 +268,19 @@ export default function EditCoursePage() {
                         <span className="text-[10px] font-black">{index + 1}</span>
                       </div>
 
-                      <div className="flex-1 space-y-1">
-                        <Input
-                          value={topic.title}
-                          className="font-bold text-lg border-none bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-auto"
-                          onChange={(e) =>
-                            updateTopicLocal(topic.id, { title: e.target.value })
-                          }
-                          onBlur={(e) => saveTopicTitle(topic.id, e.target.value)}
-                          placeholder="Untitled Topic"
-                        />
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className={cn(
-                              "h-7 px-2 text-[10px] font-black uppercase tracking-wider transition-all",
-                              topic.videoUrl
-                                ? "bg-primary/10 text-primary hover:bg-primary/20"
-                                : "text-muted-foreground hover:bg-muted"
-                            )}
-                            onClick={() => updateTopicLocal(topic.id, { showVideoSection: !topic.showVideoSection })}
-                          >
-                            <Video className="h-3 w-3 mr-1.5" />
-                            {topic.videos?.length > 1
-                              ? `${topic.videos.length} VIDEOS`
-                              : topic.videoUrl
-                                ? "VIDEO LINKED"
-                                : "ADD VIDEO"}
-                          </Button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3">
+                          <p className="font-black text-lg truncate">{topic.title || "Untitled Topic"}</p>
+                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 rounded border border-primary/20">
+                            <Video className="h-3 w-3 text-primary" />
+                            <span className="text-[10px] font-black text-primary uppercase">
+                              {topic.videos?.length || 0} Assets
+                            </span>
+                          </div>
                         </div>
+                        <p className="text-[11px] text-muted-foreground font-medium uppercase truncate opacity-70">
+                          {topic.description || "No description provided"}
+                        </p>
                       </div>
 
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -389,64 +306,7 @@ export default function EditCoursePage() {
                       </div>
                     </div>
 
-                    {topic.showVideoSection && (
-                      <div className="mt-4 rounded-lg border bg-muted/30 p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-2">
-                            <Label className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">Video Content URL</Label>
-                            <div className="flex gap-2">
-                              <Input
-                                placeholder="https://example.com/video.mp4"
-                                value={topic.videoUrl || ""}
-                                onChange={(e) => updateTopicLocal(topic.id, { videoUrl: e.target.value })}
-                                className="bg-background border-2 focus-visible:border-primary transition-colors"
-                              />
-                              <Button
-                                size="sm"
-                                disabled={topic.uploading}
-                                onClick={() => saveTopicVideoUrl(topic.id, topic.videoUrl)}
-                                className="font-bold px-4"
-                              >
-                                {topic.uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : "APPLY"}
-                              </Button>
-                            </div>
-                          </div>
 
-                          <div className="space-y-2">
-                            <Label className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">Upload from Computer</Label>
-                            <input
-                              type="file"
-                              accept="video/*"
-                              className="hidden"
-                              id={`file-upload-${topic.id}`}
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) handleVideoFileUpload(topic.id, file);
-                              }}
-                            />
-                            <Button
-                              variant="outline"
-                              className="w-full border-2 border-dashed border-primary/20 hover:border-primary/50 hover:bg-primary/5 h-10 flex gap-2 font-bold transition-all"
-                              onClick={() => document.getElementById(`file-upload-${topic.id}`)?.click()}
-                              disabled={topic.uploading}
-                            >
-                              <Upload className="h-4 w-4" />
-                              {topic.uploading ? "UPLOADING..." : "CHOOSE FILE"}
-                            </Button>
-                          </div>
-                        </div>
-
-                        {topic.uploadError && (
-                          <div className="text-xs font-bold text-destructive bg-destructive/10 p-2 rounded border border-destructive/20">{topic.uploadError}</div>
-                        )}
-
-                        {topic.videoId && (
-                          <div className="flex items-center gap-2 text-[10px] font-black text-emerald-500 bg-emerald-500/10 w-fit px-2.5 py-1 rounded-full border border-emerald-500/20">
-                            <Check className="h-3 w-3" /> ATTACHED
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>

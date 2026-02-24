@@ -3,10 +3,10 @@ import api from "./axios";
 export const getTopicsByCourse = (courseId: string) =>
     api.get(`/topics/course/${courseId}`);
 
-export const createTopic = (data: { title: string; courseId: string; orderIndex: number }) =>
+export const createTopic = (data: { title: string; course_id: string; order_index: number }) =>
     api.post("/topics", data);
 
-export const updateTopic = (id: string, data: { title?: string; description?: string; orderIndex?: number }) =>
+export const updateTopic = (id: string, data: { title?: string; description?: string; order_index?: number }) =>
     api.put(`/topics/${id}`, data);
 
 export const deleteTopic = (id: string) =>
