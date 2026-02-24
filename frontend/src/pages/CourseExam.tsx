@@ -29,18 +29,32 @@ export default function CourseExamPage() {
         const load = async () => {
             if (!courseId) return;
             try {
+                console.log("Loading exam data for courseId:", courseId);
+                
                 const [examRes, questionsRes] = await Promise.all([
-                    getAssignmentByCourse(courseId).catch(() => ({ data: null })),
-                    getFinalExamByCourse(courseId)
+                    getAssignmentByCourse(courseId).catch(err => {
+                        console.error("Failed to load assignment for exam:", err);
+                        return { data: null };
+                    }),
+                    getFinalExamByCourse(courseId).catch(err => {
+                        console.error("Failed to load exam questions:", err);
+                        return { data: [] };
+                    })
                 ]);
+                
+                console.log("Exam assignment data:", examRes.data);
+                console.log("Exam questions data:", questionsRes.data);
+                
                 const aData = examRes.data;
                 const foundExam = Array.isArray(aData) ? aData[0] : (aData?.assignment || aData?.assignments?.[0] || aData);
                 setExam(foundExam && typeof foundExam === 'object' && (foundExam.id || foundExam._id) ? foundExam : null);
 
                 const qData = questionsRes.data;
                 const qList = Array.isArray(qData) ? qData : (qData?.questions || qData?.quiz || qData?.data || []);
+                console.log("Processed questions list:", qList);
                 setQuestions(Array.isArray(qList) ? qList : []);
             } catch (e) {
+                console.error("Error loading exam data:", e);
                 setError("ASSESSMENT SERVERS TEMPORARILY UNAVAILABLE.");
             } finally {
                 setLoading(false);
@@ -60,24 +74,35 @@ export default function CourseExamPage() {
         `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
     const handleSubmit = async () => {
-        if (questions.length > 0 && Object.keys(answers).length < questions.length) return;
+        if (questions.length > 0 && Object.keys(answers).length < questions.length) {
+            alert("Please answer all questions before submitting");
+            return;
+        }
         setSubmitting(true);
         if (timerRef.current) clearInterval(timerRef.current);
         try {
             if (Object.keys(answers).length > 0) {
-                await submitQuiz({
+                console.log("Submitting exam answers:", answers);
+                
+                const submissionData = {
                     course_id: courseId,
                     answers: Object.entries(answers).map(([qId, oId]) => ({
                         question_id: qId,
                         selected_option_id: oId
                     }))
-                });
+                };
+                
+                console.log("Exam submission data:", submissionData);
+                
+                await submitQuiz(submissionData);
+                console.log("Exam submitted successfully");
             }
             setSubmitted(true);
-        } catch (e) {
-            alert("Submission failed.");
-        } finally {
+        } catch (e: any) {
+            console.error("Exam submission error:", e);
+            alert(`Failed to submit exam: ${e?.response?.data?.message || e?.message || 'Unknown error'}`);
             setSubmitting(false);
+            if (timerRef.current) setInterval(() => setElapsed(e => e + 1), 1000);
         }
     };
 

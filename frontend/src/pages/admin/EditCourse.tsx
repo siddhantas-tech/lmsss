@@ -14,7 +14,6 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -129,30 +128,42 @@ export default function EditCoursePage() {
   /* ------------------ topic handlers ------------------ */
   const handleAddTopic = async () => {
     try {
+      console.log("Adding topic to course:", id);
+      console.log("Current topics count:", topics.length);
+      
       const res = await createTopic({
         title: "New Topic",
         course_id: id!,
         order_index: topics.length,
       });
 
+      console.log("Create topic response:", res);
+
       const data = res.data;
       const foundTopic = (data?.topic || data?.data || data);
 
       if (!foundTopic || typeof foundTopic !== 'object') {
+        console.error("Invalid response from server:", data);
         throw new Error("Invalid response from server");
       }
 
       const newTopic = {
-        ...foundTopic,
+        id: foundTopic.id || foundTopic._id,
+        title: foundTopic.title || "New Topic",
+        description: foundTopic.description || "",
+        course_id: foundTopic.course_id || id!,
+        order_index: foundTopic.order_index || topics.length,
         videoUrl: foundTopic.video_url || foundTopic.videoUrl || "",
         videoId: foundTopic.video_id || foundTopic.videoId,
         videos: Array.isArray(foundTopic.videos) ? foundTopic.videos : [],
         showVideoSection: false
       };
 
+      console.log("New topic created:", newTopic);
       setTopics([...topics, newTopic]);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to create topic:", e);
+      alert(`Failed to create topic: ${e?.response?.data?.message || e?.message || 'Unknown error'}`);
     }
   };
 

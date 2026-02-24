@@ -31,18 +31,35 @@ export default function CoursePlayerPage() {
         if (!courseId) return
         const load = async () => {
             try {
+                console.log("Loading course data for courseId:", courseId);
                 const [cRes, tRes, aRes] = await Promise.all([
-                    getCourseDetails(courseId),
-                    getTopicsByCourse(courseId),
-                    getAssignmentByCourse(courseId).catch(() => ({ data: null }))
+                    getCourseDetails(courseId).catch(err => {
+                        console.error("Failed to load course details:", err);
+                        return { data: null };
+                    }),
+                    getTopicsByCourse(courseId).catch(err => {
+                        console.error("Failed to load topics:", err);
+                        return { data: [] };
+                    }),
+                    getAssignmentByCourse(courseId).catch(err => {
+                        console.error("Failed to load assignment:", err);
+                        return { data: null };
+                    })
                 ])
+                
+                console.log("Course data:", cRes.data);
+                console.log("Topics data:", tRes.data);
+                console.log("Assignment data:", aRes.data);
+                
                 setCourse(cRes.data)
-                setTopics(tRes.data)
+                setTopics(tRes.data || [])
+                
                 const aData = aRes.data;
                 const foundAssignment = Array.isArray(aData) ? aData[0] : (aData?.assignment || aData?.assignments?.[0] || aData);
+                console.log("Found assignment:", foundAssignment);
                 setAssignment(foundAssignment && typeof foundAssignment === 'object' && (foundAssignment.id || foundAssignment._id) ? foundAssignment : null)
             } catch (e) {
-                console.error(e)
+                console.error("Error loading course data:", e)
             } finally {
                 setLoading(false)
             }
@@ -68,16 +85,26 @@ export default function CoursePlayerPage() {
     }
 
     const handleAssignmentSubmit = async () => {
-        if (!assignmentFile || !assignment) return
+        if (!assignmentFile || !assignment) {
+            alert("Please select a file to submit");
+            return;
+        }
         setSubmittingAssignment(true)
         try {
+            console.log("Submitting assignment for assignment ID:", assignment.id);
+            console.log("File:", assignmentFile);
+            
             const formData = new FormData()
             formData.append('file', assignmentFile)
-            await submitAssignment(assignment.id, formData)
+            
+            const result = await submitAssignment(assignment.id, formData);
+            console.log("Assignment submission result:", result);
+            
             setAssignmentSubmitted(true)
-        } catch (e) {
-            console.error(e)
-            alert("Transmission error.")
+            alert("Assignment submitted successfully!");
+        } catch (e: any) {
+            console.error("Assignment submission error:", e);
+            alert(`Failed to submit assignment: ${e?.response?.data?.message || e?.message || 'Unknown error'}`);
         } finally {
             setSubmittingAssignment(false)
         }
