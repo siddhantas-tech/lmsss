@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import {
     createAssignment,
     getAssignmentByCourse,
@@ -11,6 +11,7 @@ import {
     deleteAssignment,
 } from "@/api/assignments";
 import { getQuestions, createQuestion, deleteQuestion } from "@/api/quiz";
+import api from "@/api/axios";
 import {
     Loader2, Trash2, Plus, Upload, FileText, BookOpen,
     CheckCircle2, AlertCircle, ChevronDown, ChevronUp
@@ -50,15 +51,24 @@ function AssignmentSection({ courseId }: { courseId: string }) {
         }
     }
 
-    async function handleCreate() {
+    async function handleCreateAssignment() {
         if (!form.title.trim()) {
             toast({ variant: "destructive", title: "Error", description: "Title is required." });
             return;
         }
         setCreating(true);
         try {
+            // First get a topic for this course to use as topic_id
+            const topicsRes = await api.get(`/topics/course/${courseId}`);
+            const topics = topicsRes.data;
+            const firstTopic = Array.isArray(topics) && topics.length > 0 ? topics[0] : null;
+            
+            if (!firstTopic) {
+                throw new Error("No topics found for this course. Please create a topic first.");
+            }
+
             const res = await createAssignment({
-                course_id: courseId,
+                topic_id: firstTopic.id,
                 title: form.title,
                 description: form.description,
                 max_marks: 100,
@@ -69,7 +79,7 @@ function AssignmentSection({ courseId }: { courseId: string }) {
             setAssignment(foundAssignment && typeof foundAssignment === 'object' ? foundAssignment : null);
             toast({ title: "Created", description: "Assignment created. Now upload an instruction file." });
         } catch (e: any) {
-            toast({ variant: "destructive", title: "Error", description: e?.response?.data?.message || "Failed to create assignment." });
+            toast({ variant: "destructive", title: "Error", description: e?.message || e?.response?.data?.message || "Failed to create assignment." });
         } finally {
             setCreating(false);
         }
@@ -84,8 +94,17 @@ function AssignmentSection({ courseId }: { courseId: string }) {
         if (!targetAssignment) {
             setUploading(true);
             try {
+                // First get a topic for this course to use as topic_id
+                const topicsRes = await api.get(`/topics/course/${courseId}`);
+                const topics = topicsRes.data;
+                const firstTopic = Array.isArray(topics) && topics.length > 0 ? topics[0] : null;
+                
+                if (!firstTopic) {
+                    throw new Error("No topics found for this course. Please create a topic first.");
+                }
+
                 const res = await createAssignment({
-                    course_id: courseId,
+                    topic_id: firstTopic.id,
                     title: form.title || "Final Assessment",
                     description: form.description || "",
                     max_marks: 100,
@@ -96,7 +115,7 @@ function AssignmentSection({ courseId }: { courseId: string }) {
                 targetAssignment = created;
                 setAssignment(created);
             } catch (e: any) {
-                toast({ variant: "destructive", title: "Error", description: "Failed to create assignment before upload." });
+                toast({ variant: "destructive", title: "Error", description: e?.message || "Failed to create assignment before upload." });
                 setUploading(false);
                 e.target.value = "";
                 return;
@@ -219,7 +238,7 @@ function AssignmentSection({ courseId }: { courseId: string }) {
                     </div>
                     <div className="flex gap-3">
                         <Button
-                            onClick={handleCreate}
+                            onClick={handleCreateAssignment}
                             disabled={creating}
                             className="flex-1 h-11 font-black text-xs uppercase tracking-widest"
                         >

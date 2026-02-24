@@ -9,7 +9,7 @@ export interface Video {
 }
 
 // Create Video via URL record (Admin)
-export const createVideo = (data: { title: string; url: string; course_id: string; topic_id: string }) =>
+export const createVideo = (data: { title: string; url: string; courseId: string; topicId: string }) =>
   api.post("/video", data);
 
 // Upload Video File (Admin)

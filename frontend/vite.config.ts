@@ -12,17 +12,20 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api/video': {
-        target: 'http://localhost:4000',
-        changeOrigin: true,
-        secure: false,
-      },
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:4000',
         changeOrigin: true,
         secure: false,
       }
     }
+  },
+  define: {
+    // For Vercel production, we'll use the deployed backend URL
+    __API_BASE_URL__: JSON.stringify(
+      process.env.NODE_ENV === 'production'
+        ? 'https://learning-management-system-be.onrender.com' // Your backend URL from vercel.json
+        : '/api'
+    )
   }
 });
 

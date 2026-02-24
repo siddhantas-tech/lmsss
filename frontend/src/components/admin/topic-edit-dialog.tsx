@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, Upload, Plus, Trash2, ExternalLink, Video } from 'lucide-react'
+import { Loader2, Upload, Plus, Trash2, ExternalLink } from 'lucide-react'
 import { uploadVideo, createVideo, deleteVideo } from '@/api/videos'
 import { updateTopic } from '@/api/topics'
 import { Textarea } from '@/components/ui/textarea'
@@ -54,8 +54,8 @@ export function TopicEditDialog({
       await createVideo({
         title: newVideoTitle.trim() || `${title} - Part ${videos.length + 1}`,
         url: newVideoUrl.trim(),
-        course_id: (topic as any).course_id || (topic as any).courseId || '',
-        topic_id: topic.id
+        courseId: (topic as any).courseId || '',
+        topicId: topic.id
       })
       setNewVideoUrl('')
       setNewVideoTitle('')
@@ -76,8 +76,8 @@ export function TopicEditDialog({
     try {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('topic_id', topic.id)
-      formData.append('course_id', (topic as any).course_id || (topic as any).courseId || '')
+      formData.append('topicId', topic.id)
+      formData.append('courseId', (topic as any).courseId || '')
       formData.append('title', newVideoTitle.trim() || `${title} - Part ${videos.length + 1}`)
 
       await uploadVideo(formData)
@@ -85,7 +85,7 @@ export function TopicEditDialog({
       onSuccess()
     } catch (err: any) {
       console.error('Upload failed:', err)
-      alert('Upload failed.')
+      alert(`Upload failed: ${err?.response?.data?.message || err?.message || 'Unknown error'}`)
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''

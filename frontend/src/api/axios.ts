@@ -1,8 +1,8 @@
 import axios from "axios";
 import { ensureDevToken } from "./auth";
 
-// Use Vercel proxy in production, Vite dev proxy in development
-const BASE_URL = "/api";
+// Use Vercel proxy in development, direct backend URL in production
+const BASE_URL = typeof __API_BASE_URL__ !== 'undefined' ? __API_BASE_URL__ : "/api";
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -13,7 +13,7 @@ api.interceptors.request.use(async (config) => {
   let token = localStorage.getItem("token");
   
   // If no token exists, try to generate one for development
-  if (!token && import.meta.env.DEV) {
+  if (!token && process.env.NODE_ENV !== 'production') {
     try {
       token = await ensureDevToken();
     } catch (error) {
