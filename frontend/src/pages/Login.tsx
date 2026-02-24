@@ -10,6 +10,7 @@ const Login = () => {
         setLoading(true);
         try {
             console.log('Attempting dev login for role:', role);
+            console.log('Making API call to:', '/dev/generate-token');
             const response = await generateDevToken(role);
             console.log('API response:', response);
             
@@ -30,13 +31,14 @@ const Login = () => {
             console.error('Dev login failed:', error);
             console.error('Error response:', error.response);
             console.error('Error message:', error.message);
+            console.error('Error status:', error.response?.status);
             
-            if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
-                alert('Cannot connect to backend server. Please ensure:\n1. Backend server is running on port 4000\n2. No firewall blocking the connection');
+            if (error.response?.status === 405) {
+                alert('CORS error: Backend is blocking the request. Check CORS settings on your backend server.');
             } else if (error.response?.status === 404) {
-                alert('Backend endpoint not found. Check if the backend has the /dev/generate-token endpoint.');
-            } else if (error.response?.status === 500) {
-                alert('Backend server error. Check backend logs.');
+                alert('Dev endpoint not found. Check if /dev/generate-token exists on your backend.');
+            } else if (error.code === 'ERR_NETWORK' || error.code === 'ECONNREFUSED') {
+                alert('Cannot connect to backend. Ensure backend is running on port 4000.');
             } else {
                 alert('Login failed: ' + (error.message || 'Unknown error'));
             }
