@@ -59,7 +59,7 @@ function AssignmentSection({ courseId }: { courseId: string }) {
         setCreating(true);
         try {
             // First get a topic for this course to use as topic_id
-            const topicsRes = await api.get(`/topics/course/${courseId}`);
+            const topicsRes = await api.get(`/api/topics/course/${courseId}`);
             const topics = topicsRes.data;
             const firstTopic = Array.isArray(topics) && topics.length > 0 ? topics[0] : null;
             
@@ -95,7 +95,7 @@ function AssignmentSection({ courseId }: { courseId: string }) {
             setUploading(true);
             try {
                 // First get a topic for this course to use as topic_id
-                const topicsRes = await api.get(`/topics/course/${courseId}`);
+                const topicsRes = await api.get(`/api/topics/course/${courseId}`);
                 const topics = topicsRes.data;
                 const firstTopic = Array.isArray(topics) && topics.length > 0 ? topics[0] : null;
                 

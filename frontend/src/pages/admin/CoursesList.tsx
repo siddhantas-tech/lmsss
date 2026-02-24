@@ -35,8 +35,7 @@ export default function AdminCoursesList() {
         try {
             const res = await getCourses();
             setCourses(Array.isArray(res.data) ? res.data : []);
-        } catch (error) {
-            console.error("Error fetching courses:", error);
+        } catch (error: any) {
             setCourses([]); // Ensure courses is always an array
         } finally {
             setLoading(false);
