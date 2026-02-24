@@ -246,6 +246,21 @@ export default function EditCoursePage() {
               <CardTitle>Course Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Category</label>
+                <Select value={course.categoryId} onValueChange={(value) => setCourse({ ...course, categoryId: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <Input
                 value={course.title}
                 onChange={(e) =>
@@ -345,26 +360,25 @@ export default function EditCoursePage() {
         <div className="space-y-8">
           <Card>
             <CardHeader>
-              <CardTitle>Category</CardTitle>
+              <CardTitle>Course Status</CardTitle>
             </CardHeader>
             <CardContent>
-              <Select
-                value={course.categoryId}
-                onValueChange={(val) =>
-                  setCourse({ ...course, categoryId: val })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Topics</span>
+                  <Badge variant="secondary">{topics.length}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Labs</span>
+                  <Badge variant="secondary">{selectedLabs.length}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Category</span>
+                  <Badge variant="secondary">
+                    {categories.find(c => c.id === course.categoryId)?.name || 'Not selected'}
+                  </Badge>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -412,18 +426,13 @@ export default function EditCoursePage() {
               </Popover>
 
               <div className="flex flex-wrap gap-2 mt-3">
-                {selectedLabs.map((id) => {
-                  const lab = labs.find((l) => l.id === id);
-                  if (!lab) return null;
-                  return (
-                    <Badge key={id}>
-                      {lab.code}
-                      <Trash2
-                        className="ml-1 h-3 w-3 cursor-pointer"
-                        onClick={() => toggleLab(id)}
-                      />
+                {selectedLabs.map((labId) => {
+                  const lab = labs.find((l) => l.id === labId);
+                  return lab ? (
+                    <Badge key={labId} variant="secondary" className="gap-1">
+                      {lab.name}
                     </Badge>
-                  );
+                  ) : null;
                 })}
               </div>
             </CardContent>
