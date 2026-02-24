@@ -85,10 +85,12 @@ export default function CourseExamPage() {
                 console.log("Submitting exam answers:", answers);
                 
                 const submissionData = {
-                    course_id: courseId,
+                    courseId: courseId,
+                    isFinalExam: true,
+                    timeTaken: elapsed,
                     answers: Object.entries(answers).map(([qId, oId]) => ({
-                        question_id: qId,
-                        selected_option_id: oId
+                        questionId: qId,
+                        selectedOptionId: oId
                     }))
                 };
                 

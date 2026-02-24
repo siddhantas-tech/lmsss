@@ -1,6 +1,7 @@
 import api from "./axios";
 
-export const createAssignment = (data: { course_id: string; title: string; description: string; max_marks: number; passing_marks: number }) =>
+// Admin assignment endpoints
+export const createAssignment = (data: { topic_id: string; title: string; description: string; max_marks: number; passing_marks: number }) =>
     api.post("/admin/assignments", data);
 
 export const updateAssignment = (assignmentId: string, data: any) =>

@@ -1,20 +1,16 @@
 import api from "./axios";
 
 export const getTopicsByCourse = (courseId: string) =>
-    api.get(`/topics/course/${courseId}`);
+  api.get(`/topics/course/${courseId}`);
 
-export const createTopic = (data: { title: string; course_id: string; order_index: number }) =>
-    api.post("/topics", data);
+export const createTopic = (data: { title: string; courseId: string; orderIndex: number }) =>
+  api.post("/topics", data);
 
-export const updateTopic = (id: string, data: { title?: string; description?: string; order_index?: number }) =>
-    api.put(`/topics/${id}`, data);
+export const updateTopic = (id: string, data: { title?: string; description?: string; orderIndex?: number }) =>
+  api.put(`/topics/${id}`, data);
 
 export const deleteTopic = (id: string) =>
-    api.delete(`/topics/${id}`);
+  api.delete(`/topics/${id}`);
 
-export const uploadAssignment = (formData: FormData) =>
-    api.post("/topics/assignment", formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
-    });
+export const completeTopic = (topicId: string, data: { course_id: string; watch_duration_seconds?: number }) =>
+  api.post(`/topics/${topicId}/complete`, data);
