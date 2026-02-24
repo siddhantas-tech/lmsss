@@ -6,7 +6,7 @@ export const getTopicsByCourse = (courseId: string) =>
 export const createTopic = (data: { title: string; courseId: string; orderIndex: number }) =>
     api.post("/topics", data);
 
-export const updateTopic = (id: string, data: { title?: string; orderIndex?: number }) =>
+export const updateTopic = (id: string, data: { title?: string; description?: string; orderIndex?: number }) =>
     api.put(`/topics/${id}`, data);
 
 export const deleteTopic = (id: string) =>

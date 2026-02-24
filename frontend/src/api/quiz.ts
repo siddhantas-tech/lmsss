@@ -1,6 +1,6 @@
 import api from "./axios";
 
-export const getQuestions = (params: { topicId?: string; courseId?: string }) =>
+export const getQuestions = (params: { topic_id?: string; course_id?: string; is_final_exam?: boolean }) =>
   api.get("/quiz", { params });
 
 export const createQuestion = (data: any) =>
@@ -13,11 +13,11 @@ export const deleteQuestion = (id: string) =>
   api.delete(`/quiz/${id}`);
 
 // User side
-export const getQuizByTopic = (topicId: string) =>
-  api.get(`/quiz/topic/${topicId}`);
+export const getQuizByTopic = (topic_id: string) =>
+  api.get(`/quiz/topic/${topic_id}`);
 
-export const getFinalExamByCourse = (courseId: string) =>
-  api.get("/quiz", { params: { courseId, is_final_exam: true } });
+export const getFinalExamByCourse = (course_id: string) =>
+  api.get("/quiz", { params: { course_id, is_final_exam: true } });
 
 export const submitQuiz = (data: { topic_id?: string; course_id?: string; answers: any[] }) =>
   api.post("/quiz/submit", data);

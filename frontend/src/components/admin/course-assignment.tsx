@@ -1,428 +1,537 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { cn } from "@/lib/utils";
 import {
     createAssignment,
     getAssignmentByCourse,
-    getAssignmentSubmissions,
-    evaluateSubmission,
+    uploadAssignmentFile,
     deleteAssignment,
-    updateAssignment,
-    uploadAssignmentFile
 } from "@/api/assignments";
 import { getQuestions, createQuestion, deleteQuestion } from "@/api/quiz";
 import {
-    Loader2, Trash2, Check, Plus,
-    FileText, Upload, BookOpen, Activity,
-    AlertCircle, Settings2, Pencil
+    Loader2, Trash2, Plus, Upload, FileText, BookOpen,
+    CheckCircle2, AlertCircle, ChevronDown, ChevronUp
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-export function CourseAssignmentManager({ courseId }: { courseId: string }) {
-    const navigate = useNavigate();
+/* ─────────────────────────────────────────────────────────────
+   ASSIGNMENT FILE UPLOAD SECTION
+───────────────────────────────────────────────────────────── */
+function AssignmentSection({ courseId }: { courseId: string }) {
+    const { toast } = useToast();
+    const fileRef = useRef<HTMLInputElement>(null);
+
     const [assignment, setAssignment] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [submissions, setSubmissions] = useState<any[]>([]);
-    const [questions, setQuestions] = useState<any[]>([]);
-
-    // Question Form
-    const [qForm, setQForm] = useState({
-        text: "",
-        options: [
-            { option_text: "", is_correct: false },
-            { option_text: "", is_correct: false },
-            { option_text: "", is_correct: false },
-            { option_text: "", is_correct: false }
-        ]
-    });
-
-    const [form, setForm] = useState({ title: "Final Assessment", description: "Course Final Project & Exam", max_marks: "100", passing_marks: "40" });
-    const [isEditingSettings, setIsEditingSettings] = useState(false);
-    const [uploadingRef, setUploadingRef] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [creating, setCreating] = useState(false);
+    const [form, setForm] = useState({ title: "Final Assessment", description: "Submit your completed project file." });
 
     useEffect(() => {
         if (!courseId) return;
-        loadData();
+        fetchAssignment();
     }, [courseId]);
 
-    const loadData = async () => {
+    async function fetchAssignment() {
         setLoading(true);
         try {
-            const [assignRes, questionsRes] = await Promise.all([
-                getAssignmentByCourse(courseId).catch(() => ({ data: null })),
-                getQuestions({ courseId })
-            ]);
-
-            setAssignment(assignRes.data);
-            if (assignRes.data) {
-                setForm({
-                    title: assignRes.data.title || "",
-                    description: assignRes.data.description || "",
-                    max_marks: String(assignRes.data.max_marks || 100),
-                    passing_marks: String(assignRes.data.passing_marks || 40)
-                });
-                // Load submissions if assignment exists
-                const subsRes = await getAssignmentSubmissions(assignRes.data.id).catch(() => ({ data: [] }));
-                setSubmissions(Array.isArray(subsRes.data) ? subsRes.data : []);
-            }
-
-            setQuestions(Array.isArray(questionsRes.data) ? questionsRes.data.filter((q: any) => q.is_final_exam) : []);
-        } catch (e) {
-            console.error("Failed to load data", e);
+            const res = await getAssignmentByCourse(courseId);
+            setAssignment(res.data || null);
+        } catch {
+            setAssignment(null);
         } finally {
             setLoading(false);
         }
-    };
+    }
 
-    const handleCreateAssignment = async () => {
+    async function handleCreate() {
+        if (!form.title.trim()) {
+            toast({ variant: "destructive", title: "Error", description: "Title is required." });
+            return;
+        }
+        setCreating(true);
         try {
             const res = await createAssignment({
                 course_id: courseId,
-                ...form,
-                max_marks: Number(form.max_marks),
-                passing_marks: Number(form.passing_marks)
-            });
-            setAssignment(res.data);
-            return res.data;
-        } catch (e) {
-            alert("Failed to create assessment.");
-            return null;
-        }
-    };
-
-    const handleUpdateSettings = async () => {
-        try {
-            await updateAssignment(assignment.id, {
                 title: form.title,
                 description: form.description,
-                max_marks: Number(form.max_marks),
-                passing_marks: Number(form.passing_marks)
+                max_marks: 100,
+                passing_marks: 40,
             });
-            setIsEditingSettings(false);
-            loadData();
-        } catch (e) {
-            alert("Update failed.");
-        }
-    };
-
-    const handleFileUpload = async (file: File) => {
-        let currentAssign = assignment;
-        if (!currentAssign) {
-            currentAssign = await handleCreateAssignment();
-        }
-        if (!currentAssign) return;
-
-        setUploadingRef(true);
-        try {
-            const formData = new FormData();
-            formData.append("file", file);
-            await uploadAssignmentFile(currentAssign.id, formData);
-            loadData();
-        } catch (e) {
-            alert("Upload failed.");
+            setAssignment(res.data);
+            toast({ title: "Created", description: "Assignment created. Now upload an instruction file." });
+        } catch (e: any) {
+            toast({ variant: "destructive", title: "Error", description: e?.response?.data?.message || "Failed to create assignment." });
         } finally {
-            setUploadingRef(false);
+            setCreating(false);
         }
-    };
+    }
 
-    const handleAddQuestion = async () => {
-        if (!qForm.text) return;
+    async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Auto-create assignment if it doesn't exist yet
+        let targetAssignment = assignment;
+        if (!targetAssignment) {
+            setUploading(true);
+            try {
+                const res = await createAssignment({
+                    course_id: courseId,
+                    title: form.title || "Final Assessment",
+                    description: form.description || "",
+                    max_marks: 100,
+                    passing_marks: 40,
+                });
+                targetAssignment = res.data;
+                setAssignment(res.data);
+            } catch (e: any) {
+                toast({ variant: "destructive", title: "Error", description: "Failed to create assignment before upload." });
+                setUploading(false);
+                e.target.value = "";
+                return;
+            }
+        } else {
+            setUploading(true);
+        }
+
         try {
-            await createQuestion({
-                course_id: courseId,
-                question_text: qForm.text,
-                question_type: 'multiple_choice',
-                is_final_exam: true,
-                options: qForm.options.filter(o => o.option_text)
-            });
-            setQForm({
-                text: "",
-                options: [
-                    { option_text: "", is_correct: false },
-                    { option_text: "", is_correct: false },
-                    { option_text: "", is_correct: false },
-                    { option_text: "", is_correct: false }
-                ]
-            });
-            loadData();
-        } catch (e) { console.error(e); }
-    };
+            const fd = new FormData();
+            fd.append("file", file);
+            const res = await uploadAssignmentFile(targetAssignment.id, fd);
+            const updatedAssignment = { ...targetAssignment, ...(res.data || {}), file_url: res.data?.file_url || res.data?.url };
+            setAssignment(updatedAssignment);
+            toast({ title: "Uploaded", description: "Assignment file uploaded successfully." });
+        } catch (e: any) {
+            toast({ variant: "destructive", title: "Upload Failed", description: e?.response?.data?.message || "Could not upload file." });
+        } finally {
+            setUploading(false);
+            e.target.value = "";
+        }
+    }
 
-    const handleDeleteQuestion = async (id: string) => {
+    async function handleDelete() {
+        if (!assignment || !confirm("Delete this assignment?")) return;
         try {
-            await deleteQuestion(id);
-            loadData();
-        } catch (e) { console.error(e); }
-    };
+            await deleteAssignment(assignment.id);
+            setAssignment(null);
+            toast({ title: "Deleted", description: "Assignment removed." });
+        } catch {
+            toast({ variant: "destructive", title: "Error", description: "Failed to delete assignment." });
+        }
+    }
 
-    const handleEvaluate = async (subId: string, marks: number) => {
-        try {
-            await evaluateSubmission(subId, { marks_awarded: marks });
-            loadData();
-        } catch (e) { console.error(e); }
-    };
-
-    if (loading) return (
-        <div className="flex h-48 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-    );
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between mb-2">
-                <div>
-                    <h2 className="text-xl font-bold tracking-tight">Final Assessment</h2>
-                    <p className="text-sm text-muted-foreground">Manage the final exam and project assignment.</p>
+            {assignment ? (
+                /* ── Existing assignment ── */
+                <div className="space-y-4">
+                    <div className="flex items-start gap-4 p-5 border-2 border-foreground bg-muted/5">
+                        <div className="h-10 w-10 flex-shrink-0 bg-foreground text-background flex items-center justify-center">
+                            <FileText className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-black text-sm uppercase">{assignment.title}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{assignment.description}</p>
+                            {assignment.file_url && (
+                                <a
+                                    href={assignment.file_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-block mt-2 text-[10px] font-black uppercase tracking-widest text-primary underline underline-offset-4"
+                                >
+                                    View Instruction File ↗
+                                </a>
+                            )}
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleDelete}
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10 flex-shrink-0"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </div>
+
+                    {/* File upload / replace */}
+                    <div>
+                        <input ref={fileRef} type="file" hidden onChange={handleFileUpload}
+                            accept=".pdf,.doc,.docx,.zip,.txt,.pptx" />
+                        <Button
+                            variant="outline"
+                            onClick={() => fileRef.current?.click()}
+                            disabled={uploading}
+                            className="w-full h-12 border-2 border-dashed border-foreground font-black text-xs uppercase tracking-widest hover:bg-muted/20"
+                        >
+                            {uploading
+                                ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Uploading...</>
+                                : <><Upload className="h-4 w-4 mr-2" /> {assignment.file_url ? "Replace Instruction File" : "Upload Instruction File"}</>
+                            }
+                        </Button>
+                        <p className="text-[10px] text-muted-foreground mt-2 text-center">
+                            Accepted: PDF, DOC, DOCX, ZIP, TXT, PPTX
+                        </p>
+                    </div>
                 </div>
-                {!assignment && (
-                    <Button onClick={handleCreateAssignment} variant="outline" size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" /> Setup Assessment
-                    </Button>
+            ) : (
+                /* ── Create assignment ── */
+                <div className="space-y-5">
+                    <div className="space-y-3">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                            Assignment Title
+                        </Label>
+                        <Input
+                            value={form.title}
+                            onChange={e => setForm({ ...form, title: e.target.value })}
+                            placeholder="e.g., Final Project Submission"
+                            className="h-11 border-2 border-foreground font-bold"
+                        />
+                    </div>
+                    <div className="space-y-3">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                            Instructions
+                        </Label>
+                        <Textarea
+                            value={form.description}
+                            onChange={e => setForm({ ...form, description: e.target.value })}
+                            placeholder="Describe what students need to submit..."
+                            className="min-h-[90px] border-2 border-foreground font-medium resize-none"
+                        />
+                    </div>
+                    <div className="flex gap-3">
+                        <Button
+                            onClick={handleCreate}
+                            disabled={creating}
+                            className="flex-1 h-11 font-black text-xs uppercase tracking-widest"
+                        >
+                            {creating ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creating...</> : <><Plus className="h-4 w-4 mr-2" />Create Assignment</>}
+                        </Button>
+                        <div className="flex-1">
+                            <input ref={fileRef} type="file" hidden onChange={handleFileUpload}
+                                accept=".pdf,.doc,.docx,.zip,.txt,.pptx" />
+                            <Button
+                                variant="outline"
+                                onClick={() => fileRef.current?.click()}
+                                disabled={uploading}
+                                className="w-full h-11 border-2 border-dashed border-foreground font-black text-xs uppercase tracking-widest"
+                            >
+                                {uploading
+                                    ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Uploading...</>
+                                    : <><Upload className="h-4 w-4 mr-2" />Upload & Auto-Create</>
+                                }
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   FINAL EXAM QUIZ BUILDER SECTION
+───────────────────────────────────────────────────────────── */
+function QuizBuilderSection({ courseId }: { courseId: string }) {
+    const { toast } = useToast();
+
+    const [questions, setQuestions] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [expanded, setExpanded] = useState<number | null>(null);
+
+    // New question form state
+    const emptyForm = () => ({
+        question_text: "",
+        options: ["", "", "", ""],
+        correct_index: 0,
+    });
+    const [form, setForm] = useState(emptyForm());
+
+    useEffect(() => {
+        if (!courseId) return;
+        fetchQuestions();
+    }, [courseId]);
+
+    async function fetchQuestions() {
+        setLoading(true);
+        try {
+            const res = await getQuestions({ course_id: courseId, is_final_exam: true });
+            const data = res.data;
+            setQuestions(Array.isArray(data) ? data : (Array.isArray(data?.questions) ? data.questions : []));
+        } catch {
+            setQuestions([]);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function handleAddQuestion() {
+        if (!form.question_text.trim()) {
+            toast({ variant: "destructive", title: "Error", description: "Question text is required." });
+            return;
+        }
+        const filledOptions = form.options.filter(o => o.trim());
+        if (filledOptions.length < 2) {
+            toast({ variant: "destructive", title: "Error", description: "At least 2 answer options required." });
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const payload = {
+                course_id: courseId,
+                is_final_exam: true,
+                question_text: form.question_text.trim(),
+                options: form.options
+                    .filter(o => o.trim())
+                    .map((o, i) => ({
+                        option_text: o.trim(),
+                        is_correct: i === form.correct_index,
+                    })),
+            };
+            const res = await createQuestion(payload);
+            setQuestions(prev => [...prev, res.data]);
+            setForm(emptyForm());
+            toast({ title: "Added", description: "Question added to exam." });
+        } catch (e: any) {
+            toast({ variant: "destructive", title: "Error", description: e?.response?.data?.message || "Failed to save question." });
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    async function handleDeleteQuestion(id: string) {
+        if (!confirm("Remove this question from the exam?")) return;
+        try {
+            await deleteQuestion(id);
+            setQuestions(prev => prev.filter(q => q.id !== id));
+            toast({ title: "Removed", description: "Question deleted." });
+        } catch {
+            toast({ variant: "destructive", title: "Error", description: "Failed to delete question." });
+        }
+    }
+
+    function updateOption(index: number, value: string) {
+        const opts = [...form.options];
+        opts[index] = value;
+        setForm({ ...form, options: opts });
+    }
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-8">
+            {/* Question count badge */}
+            <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 px-4 py-2 border-2 border-foreground bg-muted/5">
+                    <BookOpen className="h-4 w-4" />
+                    <span className="font-black text-xs uppercase tracking-widest">
+                        {questions.length} Question{questions.length !== 1 ? "s" : ""}
+                    </span>
+                </div>
+                {questions.length > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                        Exam Ready
+                    </div>
                 )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column: Assignment & Settings */}
-                <div className="lg:col-span-1 space-y-6">
-                    {/* Assignment Upload */}
-                    <Card className="border shadow-none">
-                        <CardHeader className="pb-3 italic">
-                            <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
-                                <FileText className="h-4 w-4" /> Final Project Brief
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex flex-col gap-3">
-                                <div className="border-2 border-dashed rounded-lg p-6 text-center space-y-3 bg-muted/30">
-                                    <Upload className="h-6 w-6 mx-auto text-muted-foreground/50" />
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-semibold">Upload Instructional Briefing</p>
-                                        <p className="text-[10px] text-muted-foreground">Students will download this file.</p>
+            {/* Existing questions list */}
+            {questions.length > 0 && (
+                <div className="space-y-2">
+                    {questions.map((q, i) => {
+                        const opts: any[] = q.options || q.QuizOptions || [];
+                        const isOpen = expanded === i;
+                        return (
+                            <div key={q.id} className="border-2 border-foreground">
+                                <button
+                                    type="button"
+                                    onClick={() => setExpanded(isOpen ? null : i)}
+                                    className="w-full flex items-center gap-3 p-4 text-left hover:bg-muted/10 transition-colors"
+                                >
+                                    <span className="h-7 w-7 flex-shrink-0 flex items-center justify-center bg-foreground text-background text-xs font-black">
+                                        {i + 1}
+                                    </span>
+                                    <span className="flex-1 font-bold text-sm truncate">
+                                        {q.question_text || q.text}
+                                    </span>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                                            {opts.length} opts
+                                        </span>
+                                        {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                        <button
+                                            type="button"
+                                            onClick={e => { e.stopPropagation(); handleDeleteQuestion(q.id); }}
+                                            className="h-6 w-6 flex items-center justify-center text-destructive hover:bg-destructive/10 rounded transition-colors"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
                                     </div>
-                                    <input
-                                        type="file"
-                                        id="brief-upload"
-                                        className="hidden"
-                                        onChange={e => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
-                                    />
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-full h-8 text-[10px] font-bold"
-                                        onClick={() => document.getElementById('brief-upload')?.click()}
-                                        disabled={uploadingRef}
-                                    >
-                                        {uploadingRef ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                                        {assignment?.file_url ? "REPLACE FILE" : "CHOOSE FILE"}
-                                    </Button>
-                                    {assignment?.file_url && (
-                                        <a href={assignment.file_url} target="_blank" rel="noopener noreferrer" className="block text-[10px] text-primary font-bold hover:underline">
-                                            VIEW CURRENT FILE
-                                        </a>
-                                    )}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Assessment Settings Toggle */}
-                    <Card className="border shadow-none">
-                        <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-2 italic">
-                                    <Settings2 className="h-4 w-4" /> Settings
-                                </CardTitle>
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsEditingSettings(!isEditingSettings)}>
-                                    <Pencil className="h-3 w-3" />
-                                </Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {isEditingSettings ? (
-                                <div className="space-y-3">
-                                    <div className="space-y-1">
-                                        <Label className="text-[10px] uppercase font-bold">Max Marks</Label>
-                                        <Input type="number" value={form.max_marks} onChange={e => setForm({ ...form, max_marks: e.target.value })} className="h-8 text-xs font-bold" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-[10px] uppercase font-bold">Passing Marks</Label>
-                                        <Input type="number" value={form.passing_marks} onChange={e => setForm({ ...form, passing_marks: e.target.value })} className="h-8 text-xs font-bold" />
-                                    </div>
-                                    <Button size="sm" className="w-full text-xs font-bold h-8" onClick={handleUpdateSettings}>UPDATE</Button>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <p className="text-[10px] uppercase text-muted-foreground font-bold">Weightage</p>
-                                        <p className="text-lg font-bold">{assignment?.max_marks || 100} pts</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] uppercase text-muted-foreground font-bold">Required</p>
-                                        <p className="text-lg font-bold">{assignment?.passing_marks || 40} pts</p>
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Right Column: Final Exam Quiz Builder */}
-                <div className="lg:col-span-2 space-y-6">
-                    <Card className="border shadow-none overflow-hidden">
-                        <CardHeader className="bg-muted/50 border-b py-3 px-4">
-                            <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center justify-between italic">
-                                <div className="flex items-center gap-2"><BookOpen className="h-4 w-4" /> Final Exam Question Bank</div>
-                                <span className="bg-foreground text-background text-[10px] px-2 py-0.5 rounded italic">{questions.length} Questions</span>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            {/* Simple Add Question Form */}
-                            <div className="p-4 border-b bg-muted/20 space-y-4">
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">New Question Content</Label>
-                                    <Input
-                                        placeholder="Enter question text here..."
-                                        value={qForm.text}
-                                        onChange={e => setQForm({ ...qForm, text: e.target.value })}
-                                        className="h-10 text-sm font-semibold shadow-none border-foreground/10 focus-visible:ring-0 focus-visible:border-foreground/30"
-                                    />
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {qForm.options.map((opt, i) => (
-                                        <div key={i} className="flex gap-2 items-center">
-                                            <button
-                                                onClick={() => {
-                                                    const next = [...qForm.options];
-                                                    next.forEach((o, idx) => o.is_correct = idx === i);
-                                                    setQForm({ ...qForm, options: next });
-                                                }}
-                                                className={cn(
-                                                    "h-8 w-8 rounded border flex items-center justify-center text-[10px] font-bold transition-all shrink-0",
-                                                    opt.is_correct ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground hover:border-foreground/30"
-                                                )}
-                                            >
-                                                {String.fromCharCode(65 + i)}
-                                            </button>
-                                            <Input
-                                                placeholder={`Option ${i + 1}`}
-                                                value={opt.option_text}
-                                                onChange={e => {
-                                                    const next = [...qForm.options];
-                                                    next[i].option_text = e.target.value;
-                                                    setQForm({ ...qForm, options: next });
-                                                }}
-                                                className="h-8 text-xs shadow-none border-foreground/5 bg-background"
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                                <Button size="sm" className="w-full text-xs font-bold" onClick={handleAddQuestion} disabled={!qForm.text}>
-                                    ADD TO EXAMINATION BANK
-                                </Button>
-                            </div>
-
-                            {/* Question List */}
-                            <div className="divide-y max-h-[500px] overflow-y-auto">
-                                {questions.map((q, idx) => (
-                                    <div key={q.id} className="p-4 hover:bg-muted/10 transition-colors group">
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div className="flex items-start gap-3">
-                                                <span className="text-[10px] font-bold text-muted-foreground bg-muted h-5 w-5 rounded flex items-center justify-center shrink-0">
-                                                    {idx + 1}
-                                                </span>
-                                                <p className="font-bold text-sm tracking-tight pt-0.5">{q.question_text}</p>
+                                </button>
+                                {isOpen && opts.length > 0 && (
+                                    <div className="px-4 pb-4 space-y-1.5 border-t-2 border-dashed border-border pt-3">
+                                        {opts.map((o: any, oi: number) => (
+                                            <div key={o.id || oi} className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${o.is_correct ? "bg-green-50 dark:bg-green-950/30 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-400" : "bg-muted/30 border border-border"}`}>
+                                                {o.is_correct && <CheckCircle2 className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />}
+                                                <span>{o.option_text}</span>
                                             </div>
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleDeleteQuestion(q.id)}>
-                                                <Trash2 className="h-3 w-3 text-destructive" />
-                                            </Button>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pl-8">
-                                            {q.quiz_options?.map((opt: any) => (
-                                                <div key={opt.id} className={cn(
-                                                    "text-[10px] font-semibold flex items-center justify-between p-2 rounded border",
-                                                    opt.is_correct ? "bg-primary/5 text-primary border-primary/20" : "bg-muted/30 border-transparent text-muted-foreground opacity-70"
-                                                )}>
-                                                    <span className="truncate">{opt.option_text}</span>
-                                                    {opt.is_correct && <Check className="h-3 w-3" />}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                                {questions.length === 0 && (
-                                    <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-2">
-                                        <AlertCircle className="h-5 w-5 opacity-20" />
-                                        <p className="text-[10px] font-bold uppercase tracking-widest italic opacity-50">No questions defined for this exam</p>
+                                        ))}
                                     </div>
                                 )}
                             </div>
-                        </CardContent>
-                    </Card>
+                        );
+                    })}
                 </div>
-            </div>
-
-            {/* Candidate Submissions - Relegated to the bottom, very clean */}
-            {submissions.length > 0 && (
-                <Card className="border shadow-none">
-                    <CardHeader className="py-3 px-4 bg-muted/30 border-b">
-                        <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-2 italic">
-                            <Activity className="h-4 w-4" /> Candidate Activity
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <div className="divide-y">
-                            {submissions.map(sub => (
-                                <div key={sub.id} className="p-4 flex items-center justify-between text-sm">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-8 w-8 rounded-full bg-foreground text-background flex items-center justify-center font-bold text-[10px]">
-                                            {sub.user_id.slice(0, 2).toUpperCase()}
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-xs">Student {sub.user_id.slice(0, 6)}</p>
-                                            <p className="text-[10px] text-muted-foreground font-medium uppercase">{new Date(sub.submitted_at).toLocaleDateString()}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-6">
-                                        <a href={sub.file_url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-primary hover:underline uppercase tracking-tighter">
-                                            DOWNLOAD ANSWER SHEET
-                                        </a>
-                                        <div className="flex items-center gap-2">
-                                            {sub.marks_awarded !== null ? (
-                                                <div className="text-right">
-                                                    <p className="text-xs font-bold">{sub.marks_awarded} / {assignment.max_marks}</p>
-                                                    <p className={cn("text-[9px] font-bold uppercase", sub.marks_awarded >= (assignment?.passing_marks || 40) ? "text-emerald-500" : "text-destructive")}>
-                                                        {sub.marks_awarded >= (assignment?.passing_marks || 40) ? 'Pass' : 'Fail'}
-                                                    </p>
-                                                </div>
-                                            ) : (
-                                                <div className="flex gap-1">
-                                                    <Input
-                                                        type="number"
-                                                        placeholder="Score"
-                                                        className="w-16 h-7 text-xs font-bold text-center"
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') handleEvaluate(sub.id, Number(e.currentTarget.value))
-                                                        }}
-                                                    />
-                                                    <Button size="sm" onClick={(e) => {
-                                                        const val = (e.currentTarget.previousElementSibling as HTMLInputElement).value;
-                                                        if (val) handleEvaluate(sub.id, Number(val));
-                                                    }} className="h-7 px-2 text-[10px] font-bold uppercase italic">Grade</Button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
             )}
+
+            {questions.length === 0 && (
+                <div className="py-10 border-2 border-dashed border-border flex flex-col items-center justify-center text-muted-foreground gap-2">
+                    <AlertCircle className="h-8 w-8 opacity-20" />
+                    <p className="font-black uppercase text-[10px] tracking-widest opacity-40">No Questions Yet</p>
+                    <p className="text-xs opacity-60">Add questions below to build the final exam.</p>
+                </div>
+            )}
+
+            {/* Add new question form */}
+            <div className="border-4 border-foreground p-6 space-y-5 bg-muted/5">
+                <h4 className="font-black text-xs uppercase tracking-widest flex items-center gap-2">
+                    <Plus className="h-4 w-4" /> Add New Question
+                </h4>
+
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                        Question Text
+                    </Label>
+                    <Textarea
+                        value={form.question_text}
+                        onChange={e => setForm({ ...form, question_text: e.target.value })}
+                        placeholder="e.g., Which manufacturing process uses additive layering?"
+                        className="min-h-[80px] border-2 border-foreground font-medium resize-none"
+                    />
+                </div>
+
+                <div className="space-y-3">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                        Answer Options — click radio to mark correct answer
+                    </Label>
+                    {form.options.map((opt, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setForm({ ...form, correct_index: i })}
+                                className={`h-7 w-7 flex-shrink-0 rounded-full border-2 flex items-center justify-center transition-all ${form.correct_index === i
+                                    ? "border-green-500 bg-green-500 text-white"
+                                    : "border-foreground hover:border-green-400"
+                                    }`}
+                            >
+                                {form.correct_index === i && <CheckCircle2 className="h-4 w-4" />}
+                            </button>
+                            <Input
+                                value={opt}
+                                onChange={e => updateOption(i, e.target.value)}
+                                placeholder={`Option ${i + 1}`}
+                                className={`h-10 border-2 font-medium ${form.correct_index === i ? "border-green-400 bg-green-50 dark:bg-green-950/20" : "border-foreground/40"}`}
+                            />
+                        </div>
+                    ))}
+                    <p className="text-[10px] text-muted-foreground">
+                        The highlighted (green) option is the correct answer.
+                    </p>
+                </div>
+
+                <Button
+                    onClick={handleAddQuestion}
+                    disabled={saving}
+                    className="w-full h-12 font-black text-xs uppercase tracking-widest"
+                >
+                    {saving
+                        ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</>
+                        : <><Plus className="h-4 w-4 mr-2" />Add Question to Exam</>
+                    }
+                </Button>
+            </div>
         </div>
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   MAIN EXPORT — tabbed layout: Assignment | Exam
+───────────────────────────────────────────────────────────── */
+export function CourseAssignmentManager({ courseId }: { courseId: string }) {
+    const [tab, setTab] = useState<"assignment" | "exam">("assignment");
+
+    return (
+        <Card className="border-2 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+            <CardHeader className="p-0 border-b-2 border-foreground">
+                <div className="flex">
+                    <button
+                        onClick={() => setTab("assignment")}
+                        className={`flex-1 flex items-center justify-center gap-2 py-4 text-[11px] font-black uppercase tracking-widest transition-colors border-r-2 border-foreground ${tab === "assignment"
+                            ? "bg-foreground text-background"
+                            : "hover:bg-muted/20"
+                            }`}
+                    >
+                        <Upload className="h-4 w-4" /> Assignment
+                    </button>
+                    <button
+                        onClick={() => setTab("exam")}
+                        className={`flex-1 flex items-center justify-center gap-2 py-4 text-[11px] font-black uppercase tracking-widest transition-colors ${tab === "exam"
+                            ? "bg-foreground text-background"
+                            : "hover:bg-muted/20"
+                            }`}
+                    >
+                        <BookOpen className="h-4 w-4" /> Final Exam Quiz
+                    </button>
+                </div>
+            </CardHeader>
+
+            <CardContent className="p-6">
+                {tab === "assignment" ? (
+                    <div className="space-y-2">
+                        <div className="mb-4">
+                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                                File Upload Assignment
+                            </p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                                Upload an instruction file that students will download, complete, and submit.
+                            </p>
+                        </div>
+                        <AssignmentSection courseId={courseId} />
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        <div className="mb-4">
+                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                                Final Exam — MCQ Quiz Builder
+                            </p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                                Build multiple-choice questions for the course final exam.
+                            </p>
+                        </div>
+                        <QuizBuilderSection courseId={courseId} />
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
 }

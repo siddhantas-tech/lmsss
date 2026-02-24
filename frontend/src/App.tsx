@@ -19,6 +19,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { UserProvider } from './components/user-provider';
 import { ThemeProvider } from './components/ui/themeProvider';
 import MainLayout from './components/layout/MainLayout';
+import { Toaster } from './components/ui/toaster';
 import './styles/index.css';
 
 
@@ -71,6 +72,7 @@ function AppContent() {
             <Route path="*" element={<Navigate to="/courses" replace />} />
           </Routes>
         </Router>
+        <Toaster />
       </UserProvider>
     </ThemeProvider>
   );

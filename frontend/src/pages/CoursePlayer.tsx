@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
     Play, CheckCircle, Clock, Lock, ArrowLeft,
-    Upload, FileText, List, Loader2, Plus, Trash2, ExternalLink
+    Upload, FileText, List, Loader2
 } from 'lucide-react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Check, ChevronsUpDown, Monitor } from 'lucide-react'
+import { Check, ChevronsUpDown, Beaker, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import {
@@ -33,9 +33,11 @@ export function CourseLabsSelector({ courseId }: { courseId: string }) {
     const [labs, setLabs] = useState<Lab[]>([])
     const [selectedLabIds, setSelectedLabIds] = useState<string[]>([])
     const [loading, setLoading] = useState(true)
+    const [isToggling, setIsToggling] = useState(false)
     const { toast } = useToast()
 
     useEffect(() => {
+        if (!courseId) return
         Promise.all([fetchLabs(), fetchAssignments()])
             .finally(() => setLoading(false))
     }, [courseId])
@@ -67,14 +69,18 @@ export function CourseLabsSelector({ courseId }: { courseId: string }) {
     }
 
     async function toggleLab(labId: string) {
-        const newSelected = selectedLabIds.includes(labId)
+        if (isToggling) return
+        setIsToggling(true)
+
+        const isSelected = selectedLabIds.includes(labId)
+        const newSelected = isSelected
             ? selectedLabIds.filter(id => id !== labId)
             : [...selectedLabIds, labId]
 
-        setSelectedLabIds(newSelected)
+        setSelectedLabIds(newSelected) // Optimistic update
 
         try {
-            await assignLabToCourse(courseId, { labIds: newSelected })
+            await assignLabToCourse(courseId, newSelected)
 
             toast({
                 title: "Updated",
@@ -87,8 +93,9 @@ export function CourseLabsSelector({ courseId }: { courseId: string }) {
                 title: "Error",
                 description: "Failed to save changes"
             })
-            // Revert
-            fetchAssignments()
+            fetchAssignments() // Revert
+        } finally {
+            setIsToggling(false)
         }
     }
 
@@ -96,7 +103,7 @@ export function CourseLabsSelector({ courseId }: { courseId: string }) {
         <Card className="border-4 border-foreground shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
             <CardHeader>
                 <CardTitle className="font-black text-sm flex items-center gap-2">
-                    <Monitor className="h-4 w-4" /> Lab Assignment
+                    <Beaker className="h-4 w-4" /> Lab Assignment
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -124,9 +131,10 @@ export function CourseLabsSelector({ courseId }: { courseId: string }) {
                                     {labs.map((lab) => (
                                         <CommandItem
                                             key={lab.id}
-                                            value={lab.name}
+                                            value={`${lab.name} ${lab.code} ${lab.id}`}
                                             onSelect={() => toggleLab(lab.id)}
                                             className="cursor-pointer font-medium"
+                                            disabled={isToggling}
                                         >
                                             <Check
                                                 className={cn(
@@ -152,8 +160,15 @@ export function CourseLabsSelector({ courseId }: { courseId: string }) {
                             const lab = labs.find(l => l.id === id)
                             if (!lab) return null
                             return (
-                                <Badge key={id} variant="secondary" className="border border-input">
+                                <Badge key={id} variant="secondary" className="border border-input flex items-center gap-1.5 px-2 py-1">
                                     {lab.code}
+                                    <Trash2
+                                        className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-destructive transition-colors"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            toggleLab(id)
+                                        }}
+                                    />
                                 </Badge>
                             )
                         })}

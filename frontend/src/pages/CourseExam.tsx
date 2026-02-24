@@ -34,7 +34,8 @@ export default function CourseExamPage() {
                     getFinalExamByCourse(courseId)
                 ]);
                 setExam(examRes.data);
-                setQuestions(Array.isArray(questionsRes.data) ? questionsRes.data : []);
+                const qData = questionsRes.data;
+                setQuestions(Array.isArray(qData) ? qData : Array.isArray(qData?.questions) ? qData.questions : []);
             } catch (e) {
                 setError("ASSESSMENT SERVERS TEMPORARILY UNAVAILABLE.");
             } finally {
@@ -63,8 +64,8 @@ export default function CourseExamPage() {
                 await submitQuiz({
                     course_id: courseId,
                     answers: Object.entries(answers).map(([qId, oId]) => ({
-                        questionId: qId,
-                        selectedOptionId: oId
+                        question_id: qId,
+                        selected_option_id: oId
                     }))
                 });
             }
@@ -123,7 +124,23 @@ export default function CourseExamPage() {
     const currentQ = questions[activeQ];
     const totalQ = questions.length;
     const answeredCount = Object.keys(answers).length;
-    const allAnswered = answeredCount === totalQ;
+    const allAnswered = totalQ > 0 && answeredCount === totalQ;
+
+    // No questions yet
+    if (!loading && totalQ === 0) return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-8">
+            <div className="max-w-md w-full text-center space-y-6">
+                <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
+                    <AlertTriangle className="w-8 h-8 text-muted-foreground/40" />
+                </div>
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight">No Exam Questions Yet</h1>
+                    <p className="text-muted-foreground mt-2 text-sm">The instructor hasn't published any questions for this exam.</p>
+                </div>
+                <Button onClick={() => navigate(`/courses/${courseId}`)} variant="outline" className="w-full">Back to Course</Button>
+            </div>
+        </div>
+    );
 
     return (
         <div className="min-h-screen bg-background flex flex-col">
@@ -151,11 +168,11 @@ export default function CourseExamPage() {
                     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500" key={currentQ.id}>
                         <div className="space-y-4">
                             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Question {activeQ + 1} of {totalQ}</span>
-                            <h2 className="text-2xl font-bold tracking-tight leading-snug">{currentQ.question_text}</h2>
+                            <h2 className="text-2xl font-bold tracking-tight leading-snug">{currentQ.question_text || currentQ.text}</h2>
                         </div>
 
                         <div className="space-y-3">
-                            {currentQ.quiz_options?.map((opt: any, oi: number) => {
+                            {(currentQ.quiz_options || currentQ.options || currentQ.QuizOptions || []).map((opt: any, oi: number) => {
                                 const isSelected = answers[currentQ.id] === opt.id;
                                 return (
                                     <button

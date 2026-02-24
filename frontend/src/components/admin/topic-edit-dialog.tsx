@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label'
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Loader2, Upload, Plus, Trash2, ExternalLink } from 'lucide-react'
-import { updateVideo, uploadVideo, createVideo, deleteVideo } from '@/api/videos'
+import { uploadVideo, createVideo, deleteVideo } from '@/api/videos'
+import { updateTopic } from '@/api/topics'
 import { Textarea } from '@/components/ui/textarea'
 
 interface TopicEditDialogProps {
@@ -123,7 +124,7 @@ export function TopicEditDialog({
 
     setLoading(true)
     try {
-      await updateVideo(topic.id, {
+      await updateTopic(topic.id, {
         title: title.trim(),
         description: description.trim(),
       })
@@ -131,7 +132,7 @@ export function TopicEditDialog({
       onSuccess()
       onOpenChange(false)
     } catch (err: any) {
-      console.error('Failed to update topic/video:', err)
+      console.error('Failed to update topic:', err)
       alert(err?.response?.data?.error || 'SYSTEM ERROR: Failed to commit changes to database.')
     } finally {
       setLoading(false)
