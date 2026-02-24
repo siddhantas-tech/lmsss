@@ -32,10 +32,38 @@ export default function AdminCoursesList() {
     }, []);
 
     const fetchCourses = async () => {
+        console.log('🔍 Testing backend connectivity on Vercel...');
+        console.log('🌐 API calls go to: https://learning-management-system-be.onrender.com');
+        
+        // Test basic connectivity first
+        try {
+            const testResponse = await fetch('/api/categories');
+            console.log('Backend test response status:', testResponse.status);
+            if (!testResponse.ok) {
+                const errorText = await testResponse.text();
+                console.error('Backend returned error:', testResponse.status, errorText);
+                return;
+            }
+        } catch (error) {
+            console.error('Backend not reachable:', error);
+            console.error('This means either:');
+            console.error('1. Backend on Render is down');
+            console.error('2. CORS issues between Vercel and Render');
+            console.error('3. Network connectivity issues');
+            setCourses([]);
+            setLoading(false);
+            return;
+        }
+        
         try {
             const res = await getCourses();
+            console.log('Courses API response:', res);
+            console.log('Courses data:', res.data);
             setCourses(Array.isArray(res.data) ? res.data : []);
         } catch (error: any) {
+            console.error("Error fetching courses:", error);
+            console.error("Error status:", error.response?.status);
+            console.error("Error data:", error.response?.data);
             setCourses([]); // Ensure courses is always an array
         } finally {
             setLoading(false);
