@@ -39,7 +39,10 @@ function AssignmentSection({ courseId }: { courseId: string }) {
         setLoading(true);
         try {
             const res = await getAssignmentByCourse(courseId);
-            setAssignment(res.data || null);
+            const data = res.data;
+            // Robust check: handle array, nested object, or direct object
+            const foundAssignment = Array.isArray(data) ? data[0] : (data?.assignment || data?.assignments?.[0] || data);
+            setAssignment(foundAssignment && typeof foundAssignment === 'object' && foundAssignment.id ? foundAssignment : null);
         } catch {
             setAssignment(null);
         } finally {
@@ -269,7 +272,9 @@ function QuizBuilderSection({ courseId }: { courseId: string }) {
         try {
             const res = await getQuestions({ course_id: courseId, is_final_exam: true });
             const data = res.data;
-            setQuestions(Array.isArray(data) ? data : (Array.isArray(data?.questions) ? data.questions : []));
+            // Robust check for questions array
+            const qList = Array.isArray(data) ? data : (data?.questions || data?.quiz || data?.data || []);
+            setQuestions(Array.isArray(qList) ? qList : []);
         } catch {
             setQuestions([]);
         } finally {

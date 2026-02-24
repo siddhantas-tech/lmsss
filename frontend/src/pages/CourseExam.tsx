@@ -33,9 +33,13 @@ export default function CourseExamPage() {
                     getAssignmentByCourse(courseId).catch(() => ({ data: null })),
                     getFinalExamByCourse(courseId)
                 ]);
-                setExam(examRes.data);
+                const aData = examRes.data;
+                const foundExam = Array.isArray(aData) ? aData[0] : (aData?.assignment || aData?.assignments?.[0] || aData);
+                setExam(foundExam && typeof foundExam === 'object' && (foundExam.id || foundExam._id) ? foundExam : null);
+
                 const qData = questionsRes.data;
-                setQuestions(Array.isArray(qData) ? qData : Array.isArray(qData?.questions) ? qData.questions : []);
+                const qList = Array.isArray(qData) ? qData : (qData?.questions || qData?.quiz || qData?.data || []);
+                setQuestions(Array.isArray(qList) ? qList : []);
             } catch (e) {
                 setError("ASSESSMENT SERVERS TEMPORARILY UNAVAILABLE.");
             } finally {
@@ -168,7 +172,7 @@ export default function CourseExamPage() {
                     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500" key={currentQ.id}>
                         <div className="space-y-4">
                             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Question {activeQ + 1} of {totalQ}</span>
-                            <h2 className="text-2xl font-bold tracking-tight leading-snug">{currentQ.question_text || currentQ.text}</h2>
+                            <h2 className="text-2xl font-bold tracking-tight leading-snug">{currentQ.question_text || currentQ.text || currentQ.question}</h2>
                         </div>
 
                         <div className="space-y-3">

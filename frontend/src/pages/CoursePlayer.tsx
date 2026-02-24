@@ -38,7 +38,9 @@ export default function CoursePlayerPage() {
                 ])
                 setCourse(cRes.data)
                 setTopics(tRes.data)
-                setAssignment(aRes.data)
+                const aData = aRes.data;
+                const foundAssignment = Array.isArray(aData) ? aData[0] : (aData?.assignment || aData?.assignments?.[0] || aData);
+                setAssignment(foundAssignment && typeof foundAssignment === 'object' && (foundAssignment.id || foundAssignment._id) ? foundAssignment : null)
             } catch (e) {
                 console.error(e)
             } finally {
