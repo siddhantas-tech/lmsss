@@ -76,8 +76,8 @@ export function TopicEditDialog({
     try {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('topicId', topic.id)
-      formData.append('courseId', (topic as any).course_id || (topic as any).courseId || '')
+      formData.append('course_id', (topic as any).course_id || (topic as any).courseId || '')
+      formData.append('topic_id', topic.id)
       formData.append('title', newVideoTitle.trim() || `${title} - Part ${videos.length + 1}`)
 
       await uploadVideo(formData)

@@ -117,7 +117,7 @@ function AssignmentSection({ courseId }: { courseId: string }) {
             } catch (e: any) {
                 toast({ variant: "destructive", title: "Error", description: e?.message || "Failed to create assignment before upload." });
                 setUploading(false);
-                e.target.value = "";
+                if (fileRef.current) fileRef.current.value = "";
                 return;
             }
         } else {
@@ -135,7 +135,7 @@ function AssignmentSection({ courseId }: { courseId: string }) {
             toast({ variant: "destructive", title: "Upload Failed", description: e?.response?.data?.message || "Could not upload file." });
         } finally {
             setUploading(false);
-            e.target.value = "";
+            if (fileRef.current) fileRef.current.value = "";
         }
     }
 
