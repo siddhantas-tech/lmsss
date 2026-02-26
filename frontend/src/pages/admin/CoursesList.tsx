@@ -35,17 +35,17 @@ export default function AdminCoursesList() {
         console.log('🔍 Testing backend connectivity on Vercel...');
         console.log('🌐 API calls go to: https://learning-management-system-be.onrender.com');
         
-        // Test basic connectivity first
+        // Test 1: Network connectivity
         try {
             const testResponse = await fetch('/api/categories');
-            console.log('Backend test response status:', testResponse.status);
+            console.log('✅ Network test - Backend reachable:', testResponse.status);
             if (!testResponse.ok) {
                 const errorText = await testResponse.text();
-                console.error('Backend returned error:', testResponse.status, errorText);
+                console.error('❌ Backend returned error:', testResponse.status, errorText);
                 return;
             }
         } catch (error) {
-            console.error('Backend not reachable:', error);
+            console.error('❌ Network test failed:', error);
             console.error('This means either:');
             console.error('1. Backend on Render is down');
             console.error('2. CORS issues between Vercel and Render');
@@ -55,15 +55,56 @@ export default function AdminCoursesList() {
             return;
         }
         
+        // Test 2: Authentication check
+        const token = localStorage.getItem("token");
+        console.log('🔐 Authentication test:');
+        console.log('Token exists:', !!token);
+        console.log('Token length:', token?.length || 0);
+        if (token) {
+            console.log('Token starts with:', token.substring(0, 20) + '...');
+        } else {
+            console.log('❌ No token found - user not logged in');
+            setCourses([]);
+            setLoading(false);
+            return;
+        }
+        
+        // Test 3: CORS headers check
         try {
+            const corsTest = await fetch('/api/categories', {
+                method: 'OPTIONS',
+                headers: {
+                    'Origin': window.location.origin,
+                    'Access-Control-Request-Method': 'GET',
+                    'Access-Control-Request-Headers': 'Content-Type, Authorization'
+                }
+            });
+            console.log('✅ CORS test - OPTIONS request:', corsTest.status);
+            console.log('CORS headers:', Object.fromEntries(corsTest.headers.entries()));
+        } catch (corsError) {
+            console.error('❌ CORS test failed:', corsError);
+        }
+        
+        // Test 4: Actual API call
+        try {
+            console.log('🚀 Making actual API call to getCourses...');
             const res = await getCourses();
-            console.log('Courses API response:', res);
+            console.log('✅ API call successful:', res);
             console.log('Courses data:', res.data);
             setCourses(Array.isArray(res.data) ? res.data : []);
         } catch (error: any) {
-            console.error("Error fetching courses:", error);
+            console.error("❌ API call failed:", error);
             console.error("Error status:", error.response?.status);
             console.error("Error data:", error.response?.data);
+            console.error("Error headers:", error.response?.headers);
+            
+            if (error.response?.status === 401) {
+                console.error('❌ Authentication failed - token invalid or expired');
+            } else if (error.response?.status === 403) {
+                console.error('❌ Authorization failed - insufficient permissions');
+            } else if (error.response?.status === 405) {
+                console.error('❌ Method not allowed - CORS or routing issue');
+            }
             setCourses([]); // Ensure courses is always an array
         } finally {
             setLoading(false);
