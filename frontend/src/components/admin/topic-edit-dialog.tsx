@@ -80,11 +80,20 @@ export function TopicEditDialog({
       formData.append('topic_id', topic.id)
       formData.append('title', newVideoTitle.trim() || `${title} - Part ${videos.length + 1}`)
 
+      console.log('Uploading video with FormData:', {
+        file: file.name,
+        course_id: (topic as any).course_id || (topic as any).courseId,
+        topic_id: topic.id,
+        title: newVideoTitle.trim() || `${title} - Part ${videos.length + 1}`,
+        formDataKeys: Array.from(formData.keys())
+      })
+
       await uploadVideo(formData)
       setNewVideoTitle('')
       onSuccess()
     } catch (err: any) {
       console.error('Upload failed:', err)
+      console.error('Error response:', err?.response?.data)
       alert(`Upload failed: ${err?.response?.data?.message || err?.message || 'Unknown error'}`)
     } finally {
       setUploading(false)

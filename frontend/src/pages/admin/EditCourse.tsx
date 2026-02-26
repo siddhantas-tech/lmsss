@@ -130,8 +130,8 @@ export default function EditCoursePage() {
     try {
       const res = await createTopic({
         title: "New Topic",
-        courseId: id!,
-        orderIndex: topics.length,
+        course_id: id!,
+        order_index: topics.length,
       });
 
       const data = res.data;

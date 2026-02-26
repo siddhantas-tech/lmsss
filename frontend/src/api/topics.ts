@@ -13,10 +13,10 @@ export interface Topic {
 export const getTopicsByCourse = (courseId: string) =>
   api.get(`/api/topics/course/${courseId}`);
 
-export const createTopic = (data: { title: string; description?: string; courseId: string; orderIndex: number }) =>
+export const createTopic = (data: { title: string; description?: string; course_id: string; order_index: number }) =>
   api.post('/api/topics', data);
 
-export const updateTopic = (id: string, data: { title?: string; description?: string; orderIndex?: number }) =>
+export const updateTopic = (id: string, data: { title?: string; description?: string; order_index?: number }) =>
   api.put(`/api/topics/${id}`, data);
 
 export const deleteTopic = (id: string) =>
