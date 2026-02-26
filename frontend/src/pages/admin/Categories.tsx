@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -165,6 +166,9 @@ export default function CategoriesPage() {
             <DialogTitle className="text-2xl font-black uppercase tracking-tight">
               {editingId ? "Edit Category" : "Create Category"}
             </DialogTitle>
+            <DialogDescription>
+              {editingId ? "Update the category details below." : "Create a new category for organizing courses."}
+            </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit}>

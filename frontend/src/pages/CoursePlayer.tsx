@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { getCourseDetails } from '@/api/courses'
 import { getTopicsByCourse } from '@/api/topics'
 import { getAssignmentByCourse, submitAssignment } from '@/api/assignments'
-import { getFinalExamByCourse } from '@/api/quiz'
+import { requestCertificate } from '@/api/certificates'
 
 export default function CoursePlayerPage() {
     const { id: courseId } = useParams<{ id: string }>()
@@ -27,6 +27,8 @@ export default function CoursePlayerPage() {
     const [assignmentFile, setAssignmentFile] = useState<File | null>(null)
     const [submittingAssignment, setSubmittingAssignment] = useState(false)
     const [assignmentSubmitted, setAssignmentSubmitted] = useState(false)
+    const [examCompleted, setExamCompleted] = useState(false)
+    const [requestingCertificate, setRequestingCertificate] = useState(false)
 
     useEffect(() => {
         if (!courseId) return
@@ -115,6 +117,22 @@ export default function CoursePlayerPage() {
         }
     }
 
+    const handleCertificateRequest = async () => {
+        if (!courseId) return;
+        setRequestingCertificate(true)
+        try {
+            console.log("Requesting certificate for course:", courseId);
+            await requestCertificate(courseId);
+            alert("Certificate request submitted successfully! Your certificate will be available after admin approval.");
+            setExamCompleted(true)
+        } catch (e: any) {
+            console.error("Certificate request error:", e);
+            alert(`Failed to request certificate: ${e?.response?.data?.message || e?.message || 'Unknown error'}`);
+        } finally {
+            setRequestingCertificate(false)
+        }
+    }
+
     if (loading) return (
         <div className="flex h-screen items-center justify-center bg-background">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -163,7 +181,7 @@ export default function CoursePlayerPage() {
 
                 <div className="prose prose-invert max-w-none">
                     <p className="text-muted-foreground leading-relaxed text-sm">
-                        {activeTopic?.description || 'Deep dive into the specialized methodologies and core operational structures of this module.'}
+                        {activeTopic?.description || 'Deep dive into specialized methodologies and core operational structures of this module.'}
                     </p>
                 </div>
             </div>
@@ -269,7 +287,7 @@ export default function CoursePlayerPage() {
                 <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Final Assessment</span>
                 <h2 className="text-3xl font-bold tracking-tight mt-2">{assignment?.title || 'Operational Project'}</h2>
                 <p className="text-sm text-muted-foreground mt-4 leading-relaxed">
-                    {assignment?.description || 'Implement the technical methodologies discussed in the course curriculum and submit your operational report for review.'}
+                    {assignment?.description || 'Implement technical methodologies discussed in course curriculum and submit your operational report for review.'}
                 </p>
             </div>
 
@@ -384,6 +402,39 @@ export default function CoursePlayerPage() {
                 >
                     Start Final Exam
                 </Button>
+            </div>
+
+            {/* Certificate Request Section */}
+            <div className="p-8 border rounded-2xl bg-amber-500/5 text-center space-y-4 border-amber-500/20">
+                <div className="w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold">Request Certificate</h3>
+                    <p className="text-sm text-muted-foreground mt-1 font-medium">
+                        {examCompleted 
+                            ? "Certificate request submitted! Awaiting admin approval."
+                            : "After completing the exam, request your certificate here."
+                        }
+                    </p>
+                </div>
+                <Button
+                    className="w-full h-12 font-bold uppercase tracking-wider bg-amber-600 hover:bg-amber-700"
+                    onClick={handleCertificateRequest}
+                    disabled={examCompleted || requestingCertificate}
+                >
+                    {requestingCertificate ? (
+                        <Loader2 className="animate-spin mr-2 h-4 w-4" />
+                    ) : examCompleted ? (
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                    ) : (
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                    )}
+                    {examCompleted ? "Request Submitted" : "Request Certificate"}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                    Note: Certificate will be issued after admin approval
+                </p>
             </div>
         </div>
     )

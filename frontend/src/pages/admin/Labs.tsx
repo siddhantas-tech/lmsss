@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogFooter,
@@ -203,7 +204,7 @@ export default function LabsPage() {
                         <DialogTitle className="text-3xl font-black uppercase tracking-tighter leading-none">
                             {editingId ? "Modify Lab Node" : "Initialize Lab"}
                         </DialogTitle>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground mt-2">Infrastructure Parameter Configuration</p>
+                        <DialogDescription className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground mt-2">Infrastructure Parameter Configuration</DialogDescription>
                     </DialogHeader>
 
                     <form onSubmit={handleSubmit}>

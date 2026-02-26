@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Loader2, Upload, Plus, Trash2, ExternalLink } from 'lucide-react'
 import { uploadVideo, createVideo, deleteVideo } from '@/api/videos'
 import { updateTopic } from '@/api/topics'
@@ -141,7 +141,7 @@ export function TopicEditDialog({
       <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden border-2 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
         <DialogHeader className="bg-foreground text-background p-6">
           <DialogTitle className="text-xl font-black uppercase tracking-tight italic">Topic Editor</DialogTitle>
-          <p className="text-[10px] font-bold uppercase opacity-60">Control Curriculum Assets</p>
+          <DialogDescription className="text-[10px] font-bold uppercase opacity-60">Control Curriculum Assets</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
