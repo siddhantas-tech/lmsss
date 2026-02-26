@@ -5,10 +5,6 @@
       "destination": "https://learning-management-system-be.onrender.com/api/:path*"
     },
     {
-      "source": "/dev/:path*",
-      "destination": "https://learning-management-system-be.onrender.com/dev/:path*"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

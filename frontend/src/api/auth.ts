@@ -1,7 +1,7 @@
 import api from "./axios";
 
 export const generateDevToken = (role: string) =>
-  api.post("/dev/generate-token", { role });
+  api.post("/api/dev/generate-token", { role });
 
 export const generateAndStoreDevToken = async (role: 'admin' | 'client' = 'admin') => {
   try {
