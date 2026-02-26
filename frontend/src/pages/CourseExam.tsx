@@ -158,6 +158,11 @@ export default function CourseExamPage() {
     const answeredCount = Object.keys(answers).length;
     const allAnswered = totalQ > 0 && answeredCount === totalQ;
 
+    // Debug logging for quiz options
+    console.log('Current question:', currentQ);
+    console.log('Available option fields:', currentQ ? Object.keys(currentQ) : 'No question');
+    console.log('Options array:', currentQ?.quiz_options || currentQ?.options || currentQ?.QuizOptions || 'No options found');
+
     // No questions yet
     if (!loading && totalQ === 0) return (
         <div className="min-h-screen bg-background flex items-center justify-center p-8">
@@ -227,7 +232,7 @@ export default function CourseExamPage() {
                                             "font-semibold text-sm tracking-tight",
                                             isSelected ? "text-primary" : "text-foreground"
                                         )}>
-                                            {opt.option_text}
+                                            {opt.option_text || opt.text || opt.optionText || opt.content}
                                         </span>
                                     </button>
                                 );

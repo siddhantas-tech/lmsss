@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { getCourseDetails } from '@/api/courses'
 import { getTopicsByCourse } from '@/api/topics'
 import { getAssignmentByCourse, submitAssignment } from '@/api/assignments'
+import { getFinalExamByCourse } from '@/api/quiz'
 
 export default function CoursePlayerPage() {
     const { id: courseId } = useParams<{ id: string }>()
@@ -20,7 +21,7 @@ export default function CoursePlayerPage() {
     const [loading, setLoading] = useState(true)
     const [completedTopics, setCompletedTopics] = useState<Set<string>>(new Set())
 
-    const [phase, setPhase] = useState<'curriculum' | 'assignment'>('curriculum')
+    const [phase, setPhase] = useState<'curriculum' | 'assignment' | 'exam'>('curriculum')
 
     const [assignment, setAssignment] = useState<any>(null)
     const [assignmentFile, setAssignmentFile] = useState<File | null>(null)
@@ -101,7 +102,11 @@ export default function CoursePlayerPage() {
             console.log("Assignment submission result:", result);
             
             setAssignmentSubmitted(true)
-            alert("Assignment submitted successfully!");
+            alert("Assignment submitted successfully!")
+            // Auto-redirect to exam after assignment submission
+            setTimeout(() => {
+                setPhase('exam')
+            }, 1500)
         } catch (e: any) {
             console.error("Assignment submission error:", e);
             alert(`Failed to submit assignment: ${e?.response?.data?.message || e?.message || 'Unknown error'}`);
@@ -308,7 +313,7 @@ export default function CoursePlayerPage() {
                     </div>
                     <Button
                         className="w-full h-12 font-bold uppercase tracking-wider"
-                        onClick={() => navigate(`/courses/${courseId}/exam`)}
+                        onClick={() => setPhase('exam')}
                     >
                         Proceed to Final Exam
                     </Button>
@@ -345,13 +350,41 @@ export default function CoursePlayerPage() {
                     </Button>
 
                     <button
-                        onClick={() => navigate(`/courses/${courseId}/exam`)}
+                        onClick={() => setPhase('exam')}
                         className="w-full text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors mt-2"
                     >
                         Skip to Final Examination →
                     </button>
                 </div>
             )}
+        </div>
+    )
+
+    const ExamView = () => (
+        <div className="space-y-6 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="border-b pb-6">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Final Examination</span>
+                <h2 className="text-3xl font-bold tracking-tight mt-2">Course Completion Assessment</h2>
+                <p className="text-sm text-muted-foreground mt-4 leading-relaxed">
+                    Test your knowledge and understanding of the course material with this comprehensive examination.
+                </p>
+            </div>
+
+            <div className="p-8 border rounded-2xl bg-primary/5 text-center space-y-4 border-primary/20">
+                <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold">Ready for Examination</h3>
+                    <p className="text-sm text-muted-foreground mt-1 font-medium">You have completed all course requirements.</p>
+                </div>
+                <Button
+                    className="w-full h-12 font-bold uppercase tracking-wider"
+                    onClick={() => navigate(`/courses/${courseId}/exam`)}
+                >
+                    Start Final Exam
+                </Button>
+            </div>
         </div>
     )
 
@@ -382,7 +415,9 @@ export default function CoursePlayerPage() {
             </header>
 
             <main className="mx-auto max-w-7xl px-6 py-10">
-                {phase === 'curriculum' ? <CurriculumView /> : <AssignmentView />}
+                {phase === 'curriculum' ? <CurriculumView /> : 
+                 phase === 'assignment' ? <AssignmentView /> : 
+                 <ExamView />}
             </main>
         </div>
     )
