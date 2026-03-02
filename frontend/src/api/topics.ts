@@ -1,4 +1,5 @@
 import api from "./axios";
+import type { Video } from "./videos";
 
 export interface Topic {
   id: string
@@ -6,12 +7,16 @@ export interface Topic {
   description?: string
   course_id: string
   order_index: number
+  videos?: Video[]
   created_at?: string
   updated_at?: string
 }
 
 export const getTopicsByCourse = (courseId: string) =>
   api.get(`/api/topics/course/${courseId}`);
+
+export const getTopicsWithVideos = (courseId: string) =>
+  api.get(`/api/topics/course/${courseId}/with-videos`);
 
 export const createTopic = (data: { title: string; description?: string; course_id: string; order_index: number }) =>
   api.post('/api/topics', data);

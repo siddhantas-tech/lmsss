@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Loader2, Upload, Plus, Trash2, ExternalLink } from 'lucide-react'
-import { uploadVideo, createVideo, deleteVideo } from '@/api/videos'
+import { uploadVideo, uploadMultipleVideos, createVideo, deleteVideo } from '@/api/videos'
 import { updateTopic } from '@/api/topics'
 import { Textarea } from '@/components/ui/textarea'
 
@@ -38,6 +38,7 @@ export function TopicEditDialog({
   const [newVideoUrl, setNewVideoUrl] = useState('')
   const [newVideoTitle, setNewVideoTitle] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const multipleFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (topic) {
@@ -98,6 +99,41 @@ export function TopicEditDialog({
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  async function handleMultipleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files || !topic) return
+
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      
+      // Append all files
+      Array.from(files).forEach((file) => {
+        formData.append('files', file)
+      })
+      
+      formData.append('course_id', (topic as any).course_id || (topic as any).courseId || '')
+      formData.append('topic_id', topic.id)
+
+      console.log('Uploading multiple videos with FormData:', {
+        files: Array.from(files).map(f => f.name),
+        course_id: (topic as any).course_id || (topic as any).courseId,
+        topic_id: topic.id,
+        formDataKeys: Array.from(formData.keys())
+      })
+
+      await uploadMultipleVideos(formData)
+      onSuccess()
+    } catch (err: any) {
+      console.error('Multiple upload failed:', err)
+      console.error('Error response:', err?.response?.data)
+      alert(`Multiple upload failed: ${err?.response?.data?.message || err?.message || 'Unknown error'}`)
+    } finally {
+      setUploading(false)
+      if (multipleFileInputRef.current) multipleFileInputRef.current.value = ''
     }
   }
 
@@ -242,17 +278,34 @@ export function TopicEditDialog({
                     </Button>
                   </div>
 
-                  <div className="flex-shrink-0">
-                    <input ref={fileInputRef} type="file" accept="video/*" hidden onChange={handleFileUpload} />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                      className="h-9 border-2 border-foreground font-black text-[9px]"
-                    >
-                      {uploading ? <Loader2 className="animate-spin h-3 w-3" /> : <Upload className="h-3 w-3" />}
-                    </Button>
+                  <div className="flex gap-1">
+                    <div className="flex-shrink-0">
+                      <input ref={fileInputRef} type="file" accept="video/*" hidden onChange={handleFileUpload} />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="h-9 border-2 border-foreground font-black text-[9px]"
+                        title="Upload Single Video"
+                      >
+                        {uploading ? <Loader2 className="animate-spin h-3 w-3" /> : <Upload className="h-3 w-3" />}
+                      </Button>
+                    </div>
+                    
+                    <div className="flex-shrink-0">
+                      <input ref={multipleFileInputRef} type="file" accept="video/*" multiple hidden onChange={handleMultipleFileUpload} />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => multipleFileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="h-9 border-2 border-primary font-black text-[9px] text-primary hover:bg-primary hover:text-background"
+                        title="Upload Multiple Videos"
+                      >
+                        {uploading ? <Loader2 className="animate-spin h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -7,8 +7,9 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { getCourseDetails } from '@/api/courses'
-import { getTopicsByCourse } from '@/api/topics'
+import { getTopicsWithVideos, getTopicsByCourse } from '@/api/topics'
 import { getAssignmentByCourse, submitAssignment } from '@/api/assignments'
+import { getVideosByTopic } from '@/api/videos'
 import { requestCertificate } from '@/api/certificates'
 
 export default function CoursePlayerPage() {
@@ -34,45 +35,99 @@ export default function CoursePlayerPage() {
         if (!courseId) return
         const load = async () => {
             try {
-                console.log("Loading course data for courseId:", courseId);
-                const [cRes, tRes, aRes] = await Promise.all([
-                    getCourseDetails(courseId).catch(err => {
-                        console.error("Failed to load course details:", err);
-                        return { data: null };
-                    }),
-                    getTopicsByCourse(courseId).catch(err => {
-                        console.error("Failed to load topics:", err);
+                console.log("=== LOADING COURSE DATA ===");
+                console.log("CourseId:", courseId);
+                
+                // Load course details first
+                const courseRes = await getCourseDetails(courseId).catch(err => {
+                    console.error("Failed to load course details:", err);
+                    return { data: null };
+                });
+                
+                console.log("✅ Course data loaded:", courseRes.data);
+                setCourse(courseRes.data);
+                
+                if (!courseRes.data) {
+                    console.warn("⚠️ No course data found");
+                    setLoading(false);
+                    return;
+                }
+                
+                // Load topics with videos
+                console.log("📚 Loading topics with videos...");
+                const topicsRes = await getTopicsWithVideos(courseId).catch(err => {
+                    console.error("Failed to load topics with videos:", err);
+                    // Fallback to regular topics if enhanced endpoint fails
+                    return getTopicsByCourse(courseId).catch(err2 => {
+                        console.error("Failed to load topics:", err2);
                         return { data: [] };
-                    }),
-                    getAssignmentByCourse(courseId).catch(err => {
-                        console.error("Failed to load assignment:", err);
-                        return { data: null };
-                    })
-                ])
+                    });
+                });
                 
-                console.log("Course data:", cRes.data);
-                console.log("Topics data:", tRes.data);
-                console.log("Assignment data:", aRes.data);
+                console.log("✅ Topics data loaded:", topicsRes.data);
+                let topicsData = topicsRes.data || [];
                 
-                setCourse(cRes.data)
-                setTopics(tRes.data || [])
+                // If topics don't have videos, load videos separately
+                if (topicsData.length > 0 && !topicsData[0]?.videos) {
+                    console.log("🎥 Loading videos separately for topics...");
+                    topicsData = await Promise.all(
+                        topicsData.map(async (topic: any) => {
+                            try {
+                                const videosRes = await getVideosByTopic(topic.id);
+                                console.log(`📹 Videos for topic ${topic.id}:`, videosRes.data);
+                                return {
+                                    ...topic,
+                                    videos: videosRes.data || []
+                                };
+                            } catch (err) {
+                                console.error(`Failed to load videos for topic ${topic.id}:`, err);
+                                return {
+                                    ...topic,
+                                    videos: []
+                                };
+                            }
+                        })
+                    );
+                }
                 
-                const aData = aRes.data;
+                console.log("🎯 Final topics with videos:", topicsData);
+                setTopics(topicsData);
+                
+                // Load assignment
+                console.log("📝 Loading assignment...");
+                const assignmentRes = await getAssignmentByCourse(courseId).catch(err => {
+                    console.error("Failed to load assignment:", err);
+                    return { data: null };
+                });
+                
+                console.log("✅ Assignment data loaded:", assignmentRes.data);
+                const aData = assignmentRes.data;
                 const foundAssignment = Array.isArray(aData) ? aData[0] : (aData?.assignment || aData?.assignments?.[0] || aData);
-                console.log("Found assignment:", foundAssignment);
-                setAssignment(foundAssignment && typeof foundAssignment === 'object' && (foundAssignment.id || foundAssignment._id) ? foundAssignment : null)
+                console.log("📋 Found assignment:", foundAssignment);
+                setAssignment(foundAssignment && typeof foundAssignment === 'object' && (foundAssignment.id || foundAssignment._id) ? foundAssignment : null);
+                
+                console.log("=== LOADING COMPLETE ===");
+                
             } catch (e) {
-                console.error("Error loading course data:", e)
+                console.error("❌ Error loading course data:", e);
             } finally {
-                setLoading(false)
+                setLoading(false);
             }
         }
-        load()
-    }, [courseId])
+        load();
+    }, [courseId]);
 
     const activeTopic = topics[activeTopicIndex]
     const activeVideos = activeTopic?.videos || []
     const activeVideo = activeVideos[activeVideoIndex]
+
+    // Debug logging
+    useEffect(() => {
+        console.log("🎬 Active Topic:", activeTopic);
+        console.log("🎥 Active Videos:", activeVideos);
+        console.log("▶️ Active Video:", activeVideo);
+        console.log("📊 Active Video Index:", activeVideoIndex, "of", activeVideos.length);
+    }, [activeTopic, activeVideos, activeVideo, activeVideoIndex])
 
     const handleTopicComplete = () => {
         const newCompleted = new Set(completedTopics)
@@ -139,11 +194,71 @@ export default function CoursePlayerPage() {
         </div>
     )
 
+    // Show error state if no course data
+    if (!course) {
+        return (
+            <div className="flex h-screen items-center justify-center bg-background">
+                <div className="text-center space-y-4 max-w-md">
+                    <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto">
+                        <span className="text-white text-2xl">!</span>
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold">Course Not Found</h2>
+                        <p className="text-muted-foreground">Unable to load course data. Please check the course ID and try again.</p>
+                    </div>
+                    <Button onClick={() => window.location.reload()}>
+                        Try Again
+                    </Button>
+                </div>
+            </div>
+        )
+    }
+
     const completedCount = completedTopics.size
     const progressPercent = (completedCount / topics.length) * 100
 
     const CurriculumView = () => (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Debug Panel - Only in development */}
+            {import.meta.env.DEV && (
+                <div className="lg:col-span-12">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-xs">
+                        <h3 className="font-bold mb-2">🐛 Debug Info:</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div>
+                                <strong>Course:</strong> {course?.title || 'None'}
+                            </div>
+                            <div>
+                                <strong>Topics:</strong> {topics.length}
+                            </div>
+                            <div>
+                                <strong>Active Topic:</strong> {activeTopicIndex + 1}/{topics.length}
+                            </div>
+                            <div>
+                                <strong>Videos in Topic:</strong> {activeVideos.length}
+                            </div>
+                            <div>
+                                <strong>Active Video:</strong> {activeVideoIndex + 1}/{activeVideos.length}
+                            </div>
+                            <div>
+                                <strong>Assignment:</strong> {assignment ? 'Found' : 'None'}
+                            </div>
+                            <div>
+                                <strong>Phase:</strong> {phase}
+                            </div>
+                            <div>
+                                <strong>Progress:</strong> {Math.round(progressPercent)}%
+                            </div>
+                        </div>
+                        {activeVideo && (
+                            <div className="mt-2">
+                                <strong>Current Video:</strong> {activeVideo.title || 'Untitled'} ({activeVideo.url || activeVideo.video_path || 'No URL'})
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+            
             <div className="lg:col-span-8 space-y-6">
                 <div className="relative aspect-video bg-black overflow-hidden border border-border/50 group">
                     {activeVideo ? (
